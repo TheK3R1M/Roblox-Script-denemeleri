@@ -1,0 +1,153 @@
+local players = game:GetService("Players")
+local localPlayer = players.LocalPlayer
+local boothModels = workspace:FindFirstChild("BoothModels")
+
+if not boothModels then
+    warn("BoothModels bulunamadı.")
+end
+
+while true do
+    local success, err = pcall(function()
+        -- Kendi envanterinizdeki itemları tarayın
+        local myBooth = localPlayer.PlayerGui:FindFirstChild("MapUIContainer")
+        local myItems = {}
+
+        if myBooth then
+            print("MapUIContainer bulundu.")
+            local mapUI = myBooth:FindFirstChild("MapUI")
+            if mapUI then
+                print("MapUI bulundu.")
+                local boothUI = mapUI:FindFirstChild("BoothUI")
+                if boothUI then
+                    print("BoothUI bulundu.")
+                    local shopItems = boothUI:FindFirstChild("ShopItems")
+                    if shopItems then
+                        print("ShopItems bulundu.")
+                        local frame = shopItems:FindFirstChild("Frame")
+                        if frame then
+                            print("Frame bulundu.")
+                            for _, item in ipairs(frame:GetChildren()) do
+                                if item:IsA("Frame") then
+                                    local itemId = item.Name
+                                    local amount = 100 -- Her item için miktar (bunu dinamik yapabilirsiniz)
+                                    table.insert(myItems, { id = itemId, amount = amount })
+                                    print("Item eklendi: " .. itemId)
+                                end
+                            end
+                        else
+                            warn("Frame bulunamadı.")
+                        end
+                    else
+                        warn("ShopItems bulunamadı.")
+                    end
+                else
+                    warn("BoothUI bulunamadı.")
+                end
+            else
+                warn("MapUI bulunamadı.")
+            end
+        else
+            warn("MapUIContainer bulunamadı.")
+        end
+
+        -- Şimdi diğer oyuncuların standlarına yerleştirin
+        if boothModels then
+            for _, booth in ipairs(boothModels:GetChildren()) do
+                -- Diğer oyuncuların standlarını tarayın
+                local itemPart = booth:FindFirstChild("ItemPart")
+                if itemPart then
+                    print("ItemPart bulundu.")
+                    local boothUI = itemPart:FindFirstChild("MapUIContainer")
+                    if boothUI then
+                        print("MapUIContainer bulundu.")
+                        local mapUI = boothUI:FindFirstChild("MapUI")
+                        if mapUI then
+                            print("MapUI bulundu.")
+                            local boothUIElement = mapUI:FindFirstChild("BoothUI")
+                            if boothUIElement then
+                                print("BoothUI bulundu.")
+                                local items = boothUIElement:FindFirstChild("Items")
+                                if items then
+                                    print("Items bulundu.")
+                                    local frame = items:FindFirstChild("Frame")
+                                    if frame then
+                                        print("Frame bulundu.")
+                                        for _, itemData in ipairs(myItems) do
+                                            local itemId = itemData.id
+                                            local amount = itemData.amount
+                                            local args = {
+                                                [1] = "",
+                                                [2] = false,
+                                                [3] = amount,
+                                            }
+                                            local targetItem = frame:FindFirstChild(itemId)
+                                            if targetItem then
+                                                print("TargetItem bulundu: " .. itemId)
+                                                local prompt = targetItem:FindFirstChild("Prompt")
+                                                if prompt then
+                                                    print("Prompt bulundu.")
+                                                    prompt.MouseClick:Connect(function()
+                                                        -- Kendi itemlarınızı açın
+                                                        for _, myItem in ipairs(myItems) do
+                                                            local myItemId = myItem.id
+                                                            local myAmount = myItem.amount
+                                                            local myArgs = {
+                                                                [1] = "",
+                                                                [2] = false,
+                                                                [3] = myAmount,
+                                                            }
+                                                            local myTargetItem = frame:FindFirstChild(myItemId)
+                                                            if myTargetItem then
+                                                                print("MyTargetItem bulundu: " .. myItemId)
+                                                                local myPrompt = myTargetItem:FindFirstChild("Prompt")
+                                                                if myPrompt then
+                                                                    print("MyPrompt bulundu.")
+                                                                    myPrompt:FireServer(unpack(myArgs))
+                                                                    print("Başarılı: " .. myItemId .. " kendi standınızda açıldı.")
+                                                                else
+                                                                    warn("MyPrompt bulunamadı: " .. myItemId)
+                                                                end
+                                                            else
+                                                                warn("MyTargetItem bulunamadı: " .. myItemId)
+                                                            end
+                                                        end
+                                                    end)
+                                                    print("Başarılı: " .. itemId .. " diğer standda yer aldı.")
+                                                else
+                                                    warn("Prompt bulunamadı: " .. itemId)
+                                                end
+                                            else
+                                                warn("TargetItem bulunamadı: " .. itemId)
+                                            end
+                                        end
+                                    else
+                                        warn("Frame bulunamadı.")
+                                    end
+                                else
+                                    warn("Items bulunamadı.")
+                                end
+                            else
+                                warn("BoothUIElement bulunamadı.")
+                            end
+                        else
+                            warn("MapUI bulunamadı.")
+                        end
+                    else
+                        warn("MapUIContainer bulunamadı.")
+                    end
+                else
+                    warn("ItemPart bulunamadı.")
+                end
+            end
+        else
+            warn("BoothModels bulunamadı.")
+        end
+    end)
+
+    if not success then
+        warn("Bir hata oluştu: " .. err)
+        break
+    end
+
+    wait(1) -- Döngünün çok hızlı çalışmasını önlemek için bekleme süresi ekleyin
+end

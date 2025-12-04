@@ -1,0 +1,30 @@
+--Snow Mittin
+_G.autoKill = false
+
+while _G.autoKill == true do
+	wait(0.1)
+ for i,v in next, game:GetService('Players'):GetPlayers() do
+   if v.Name == game:GetService('Players').LocalPlayer.Name then
+   continue end
+   if v.Name == "asdqweasdqweasdqwd" then
+   continue end
+   if v.Name == "ck1234566" then
+   continue end
+   if v.Name == "WhiteNinjaLOL1" then
+   continue end
+   if v.Name == "HD_Phantom1" then
+   continue end
+   if v.Name == "batuu222" then
+   continue end
+   if v.Name == "AliArdaKaya" then
+   continue end
+   
+   pcall(function()
+		local args = {
+		    [1] = 19,
+		    [2] = Vector3.new(-293.11376953125, 153.35267639160156, -156.9514923095703),
+		    [3] = v.Character}
+		game:GetService("ReplicatedStorage").Events.ToolsEvent:FireServer(unpack(args))
+	  end)
+   end
+end

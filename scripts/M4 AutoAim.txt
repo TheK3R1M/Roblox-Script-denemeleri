@@ -1,0 +1,49 @@
+--M4
+_G.autoKill = false
+
+while _G.autoKill == true do
+wait(0.3)
+for i,v in next, game:GetService('Players'):GetPlayers() do
+   if v.Name == game:GetService('Players').LocalPlayer.Name then
+   continue end
+   if v.Name == "asdqweasdqweasdqwd" then
+   continue end
+   if v.Name == "ck1234566" then
+   continue end
+   if v.Name == "WhiteNinjaLOL1" then
+   continue end
+   if v.Name == "HD_Phantom1" then
+   continue end
+   if v.Name == "batuu222" then
+   continue end
+   if v.Name == "SE_LST" then
+   continue end
+   if v.Name == "akaan435312" then
+   continue end
+   
+   pcall(function()
+		local args = {
+		    [1] = 33,
+		    [2] = v.Character.HumanoidRootPart.CFrame * CFrame.Angles(-0.06165851280093193, -1.3895305395126343, -0.06065081059932709),
+		    [3] = 2,
+		    [4] = v.Character.Humanoid,
+		    [5] = 26,
+		    [6] = game:GetService("Players").LocalPlayer.Character.M4,
+		    [8] = 1}
+		game:GetService("ReplicatedStorage").Events.MenuActionEvent:FireServer(unpack(args))
+	  end)
+	  wait(0.1)
+   end
+   wait(0.1)
+	local args = {
+	    [1] = "Rifle Ammo",
+	    [2] = 15,
+	    [3] = game:GetService("Players").LocalPlayer.Character.M4}
+	game:GetService("ReplicatedStorage").Events.WeaponReloadEvent:FireServer(unpack(args))
+
+	local args = {
+	    [1] = 2,
+	    [2] = "Rifle Ammo (30x)",
+	    [4] = 8}
+	game:GetService("ReplicatedStorage").Events.MenuEvent:FireServer(unpack(args))
+end

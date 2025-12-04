@@ -1,0 +1,64 @@
+local players = game:GetService("Players")
+local localPlayer = players.LocalPlayer
+local boothModels = workspace:FindFirstChild("BoothModels")
+
+while true do
+    local success, err = pcall(function()
+        -- Kendi envanterinizdeki itemları tarayın
+        local myBooth = localPlayer.PlayerGui:FindFirstChild("MapUIContainer")
+        local myItems = {}
+
+        if myBooth and myBooth:FindFirstChild("MapUI") then
+            local boothUI = myBooth.MapUI:FindFirstChild("BoothUI") -- Örneğin kendi standınız BoothUI
+            if boothUI and boothUI.Items and boothUI.Items:FindFirstChild("Frame") then
+                for _, item in ipairs(boothUI.Items.Frame:GetChildren()) do
+                    if item:IsA("Frame") then
+                        local itemId = item.Name
+                        local amount = 100 -- Her item için miktar (bunu dinamik yapabilirsiniz)
+                        table.insert(myItems, { id = itemId, amount = amount })
+                    end
+                end
+            end
+        end
+
+        -- Şimdi diğer oyuncuların standlarına yerleştirin
+        if boothModels then
+            for _, booth in ipairs(boothModels:GetChildren()) do
+                -- Diğer oyuncuların standlarını tarayın
+                if booth:FindFirstChild("BasicBooth") then
+                    local boothUI = booth.BasicBooth:FindFirstChild("MapUIContainer")
+                    if boothUI and boothUI:FindFirstChild("MapUI") then
+                        local boothUIElement = boothUI.MapUI:FindFirstChild("BoothUI") -- Hedef booth
+                        if boothUIElement and boothUIElement.Items and boothUIElement.Items:FindFirstChild("Frame") then
+                            for _, itemData in ipairs(myItems) do
+                                local itemId = itemData.id
+                                local amount = itemData.amount
+                                local args = {
+                                    [1] = "",
+                                    [2] = false,
+                                    [3] = amount,
+                                }
+                                local targetItem = boothUIElement.Items.Frame:FindFirstChild(itemId)
+                                if targetItem and targetItem:FindFirstChild("Prompt") then
+                                    targetItem.Prompt:FireServer(unpack(args))
+                                    print("Başarılı: " .. itemId .. " diğer standda yer aldı.")
+                                else
+                                    warn("Hedef item bulunamadı: " .. itemId)
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        else
+            warn("BoothModels bulunamadı.")
+        end
+    end)
+
+    if not success then
+        warn("Bir hata oluştu: " .. err)
+        break
+    end
+
+    wait(1) -- Döngünün çok hızlı çalışmasını önlemek için bekleme süresi ekleyin
+end

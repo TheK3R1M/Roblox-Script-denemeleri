@@ -1,0 +1,95 @@
+repeat task.wait() until game:IsLoaded()
+
+if string.lower(type(isfile)) == "function" then
+    local CG = game:GetService("CoreGui")
+    for i, v in ipairs(CG:GetChildren()) do
+        if v.Name == "Stingray" then
+            v:Destroy()
+        end
+    end
+
+    if not isfile("JJI_Key.txt") then
+        local LocalPlayer = game:GetService("Players").LocalPlayer
+        local TS = game:GetService("TweenService")
+        local SG = Instance.new("ScreenGui")
+        SG.Name = "Stingray"
+        SG.Parent = CG
+
+        local MainFrame = Instance.new("Frame")
+        MainFrame.Size = UDim2.new(0.4, 0, 0.4, 0)
+        MainFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        MainFrame.BorderSizePixel = 0
+        MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+        MainFrame.ClipsDescendants = true
+        MainFrame.Draggable = true
+        MainFrame.Active = true
+        MainFrame.BackgroundTransparency = 0
+        MainFrame.Position = UDim2.new(0.25, 0, 0.5, 0)
+
+        local MainBackground = Instance.new("ImageLabel", MainFrame)
+        MainBackground.BackgroundTransparency = 1
+        MainBackground.Size = UDim2.new(1, 0, 1, 0)
+        MainBackground.Image = "http://www.roblox.com/asset/?id=118451996560056"
+
+        local X, Y = 144, 126
+        local MainFrameConstraint = Instance.new("UIAspectRatioConstraint", MainFrame)
+        MainFrameConstraint.AspectRatio = X / Y
+
+        local MainFrameRound = Instance.new("UICorner", MainFrame)
+        MainFrameRound.CornerRadius = UDim.new(0.06, 0)
+
+        local No = Instance.new("ImageButton", MainFrame)
+        No.Position = UDim2.new(39.5 / X, 0, 99.5 / Y, 0)
+        No.Size = UDim2.new(59 / X, 0, 23 / Y, 0)
+        No.AnchorPoint = Vector2.new(0.5, 0.5)
+        No.Name = "NO"
+        No.BackgroundTransparency = 1
+        No.BorderSizePixel = 0
+        No.Image = "http://www.roblox.com/asset/?id=85644186639889"
+        No.BackgroundColor3 = Color3.new(1, 1, 1)
+
+        local Yes = Instance.new("ImageButton", MainFrame)
+        Yes.Position = UDim2.new(1 - 39.5 / X, 0, 99.5 / Y, 0)
+        Yes.Size = UDim2.new(59 / X, 0, 23 / Y, 0)
+        Yes.AnchorPoint = Vector2.new(0.5, 0.5)
+        Yes.Name = "YES"
+        Yes.BackgroundTransparency = 1
+        Yes.BorderSizePixel = 0
+        Yes.Image = "http://www.roblox.com/asset/?id=118447807688172"
+        Yes.BackgroundColor3 = Color3.new(1, 1, 1)
+
+        local TextBoxConstraint = Instance.new("UIAspectRatioConstraint", TextBox)
+        TextBoxConstraint.AspectRatio = 124 / 23
+
+        Instance.new("UICorner", Submit).CornerRadius = UDim.new(0.1, 0)
+        Instance.new("UICorner", Get).CornerRadius = UDim.new(0.1, 0)
+        Instance.new("UICorner", TextBox).CornerRadius = UDim.new(0.1, 0)
+
+        MainFrame.Parent = SG
+
+        No.MouseButton1Click:Connect(function()
+            game.Players.LocalPlayer:Kick("Incorrect Key")
+        end)
+
+        No.MouseEnter:Connect(function()
+            TS:Create(No, TweenInfo.new(0.5), { ImageColor3 = Color3.new(1, 0, 0) }):Play()
+        end)
+
+        No.MouseLeave:Connect(function()
+            TS:Create(No, TweenInfo.new(0.5), { ImageColor3 = Color3.new(1, 1, 1) }):Play()
+        end)
+
+        Yes.MouseButton1Click:Connect(function()
+            writefile("JJI_Key.txt", "Correct")
+            SG:Destroy()
+        end)
+
+        Yes.MouseEnter:Connect(function()
+            TS:Create(Yes, TweenInfo.new(0.5), { ImageColor3 = Color3.new(0, 1, 0) }):Play()
+        end)
+
+        Yes.MouseLeave:Connect(function()
+            TS:Create(Yes, TweenInfo.new(0.5), { ImageColor3 = Color3.new(1, 1, 1) }):Play()
+        end)
+    end
+end

@@ -1,0 +1,37 @@
+--Famas
+_G.autoKill = false
+
+while _G.autoKill == true do
+wait(0.2)
+for i,v in next, game:GetService('Players'):GetPlayers() do
+   if v.Name == game:GetService('Players').LocalPlayer.Name then
+   continue end
+   if v.Name == "asdqweasdqweasdqwd" then
+   continue end
+   if v.Name == "ck1234566" then
+   continue end
+   if v.Name == "WhiteNinjaLOL1" then
+   continue end
+   if v.Name == "HD_Phantom1" then
+   continue end
+   if v.Name == "batuu222" then
+   continue end
+   if v.Name == "SE_LST" then
+   continue end
+   if v.Name == "akaan435312" then
+   continue end
+   
+   pcall(function()
+		local args = {
+		    [1] = 33,
+		    [2] = v.Character.HumanoidRootPart.CFrame * CFrame.Angles(2.999920606613159, -0.31925395131111145, 3.096857786178589),
+		    [3] = 2,
+		    [4] = v.Character.Humanoid,
+		    [5] = 26,
+		    [6] = game:GetService("Players").LocalPlayer.Character.Famas,
+		    [8] = 1}
+		game:GetService("ReplicatedStorage").Events.MenuActionEvent:FireServer(unpack(args))
+	  end)
+	  wait(0.1)
+   end
+end

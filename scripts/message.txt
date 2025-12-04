@@ -1,0 +1,89 @@
+--SlapBattles Auto Slapple Collect
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "SlappleCollectorGUI"
+ScreenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui") -- GUI'yi oyuncunun arayüzüne ekler
+
+-- Ana Çerçeve
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 200, 0, 100)
+MainFrame.Position = UDim2.new(0.5, -100, 0.5, -50)
+MainFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+MainFrame.BorderSizePixel = 2
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = ScreenGui
+
+-- Başlat/Durdur Butonu
+local StartStopButton = Instance.new("TextButton")
+StartStopButton.Size = UDim2.new(0, 180, 0, 40)
+StartStopButton.Position = UDim2.new(0, 10, 0, 10)
+StartStopButton.BackgroundColor3 = Color3.fromRGB(70, 130, 180)
+StartStopButton.Text = "Başlat"
+StartStopButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+StartStopButton.Font = Enum.Font.SourceSans
+StartStopButton.TextSize = 15
+StartStopButton.Parent = MainFrame
+
+-- Kapat Butonu
+local CloseButton = Instance.new("TextButton")
+CloseButton.Size = UDim2.new(0, 40, 0, 40)
+CloseButton.Position = UDim2.new(1, -50, 0, 10)
+CloseButton.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+CloseButton.Text = "X"
+CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseButton.Font = Enum.Font.SourceSans
+CloseButton.TextSize = 15
+CloseButton.Parent = MainFrame
+
+-- Açıklama Yazısı
+local InfoLabel = Instance.new("TextLabel")
+InfoLabel.Size = UDim2.new(1, -20, 0, 20)
+InfoLabel.Position = UDim2.new(0, 10, 1, -30)
+InfoLabel.BackgroundTransparency = 1
+InfoLabel.Text = "Otomatik Slapple Toplayıcı"
+InfoLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+InfoLabel.Font = Enum.Font.SourceSans
+InfoLabel.TextSize = 14
+InfoLabel.TextXAlignment = Enum.TextXAlignment.Center
+InfoLabel.Parent = MainFrame
+
+-- Slapple Toplayıcı İşlevselliği
+local Collecting = false -- Slapple toplamanın açık/kapalı durumu
+_G.CollectingEnabled = false -- Global değişkenle kontrol
+
+local function CollectSlapples()
+    while Collecting and _G.CollectingEnabled do
+        local LocalPlayer = game.Players.LocalPlayer
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            local HumanoidRootPart = LocalPlayer.Character.HumanoidRootPart
+            local Slapples = workspace.Arena.island5.Slapples:GetChildren()
+            
+            for _, Slapple in ipairs(Slapples) do
+                if Slapple:FindFirstChild("Glove") then
+                    Slapple.Glove.CFrame = HumanoidRootPart.CFrame + Vector3.new(math.random(0, 0), 0, math.random(0, 0))
+                end
+            end
+        end
+        wait(1) -- Döngü hızı (1 saniye)
+    end
+end
+
+-- Başlat/Durdur Butonu Tıklama
+StartStopButton.MouseButton1Click:Connect(function()
+    Collecting = not Collecting -- Durumu tersine çevir
+    _G.CollectingEnabled = Collecting -- Global değişkeni güncelle
+
+    if Collecting then
+        StartStopButton.Text = "Durdur"
+        CollectSlapples() -- Toplama işlemini başlat
+    else
+        StartStopButton.Text = "Başlat"
+    end
+end)
+
+-- Kapat Butonu Tıklama
+CloseButton.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy() -- GUI'yi kapat
+    Collecting = false -- Toplamayı durdur
+    _G.CollectingEnabled = false -- Global değişkeni güncelle
+end)
