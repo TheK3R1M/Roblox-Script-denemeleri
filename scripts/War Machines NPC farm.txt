@@ -1,0 +1,60 @@
+getgenv().WARMACHINES_AUTOFARM = not getgenv().WARMACHINES_AUTOFARM
+
+while getgenv().WARMACHINES_AUTOFARM do
+    local player = game:GetService("Players").LocalPlayer
+    local character = player.Character or player.CharacterAdded:Wait()
+    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    
+    -- Suitcase kontrolü ve aktivasyonu
+    local suitcase = player.Backpack:FindFirstChild("Suitcase") or character:FindFirstChild("Suitcase")
+    if suitcase then
+        suitcase.ToolListnerEvent:FireServer("Activate", "Soldier")
+        task.wait(1)
+    else
+        print('Suitcase bulunamadı!')
+    end
+    
+    -- Düşman öldürme işlemi
+    for _, mission in ipairs(workspace.Missions:GetChildren()) do
+        while getgenv().WARMACHINES_AUTOFARM and character and mission and mission:FindFirstChild("AISpawners") and not mission.AISpawners:FindFirstChildWhichIsA("Part") do
+            humanoidRootPart.CFrame = mission.WorldPivot
+            task.wait(0.25)
+        end
+        
+        if getgenv().WARMACHINES_AUTOFARM and character and mission and mission:FindFirstChild("AISpawners") then
+            for _, spawner in pairs(mission.AISpawners:GetChildren()) do
+                if getgenv().WARMACHINES_AUTOFARM and humanoidRootPart and spawner:FindFirstChildWhichIsA("Model") then
+                    local enemy = spawner:FindFirstChildWhichIsA("Model")
+                    while getgenv().WARMACHINES_AUTOFARM and enemy:FindFirstChildOfClass("Humanoid") and enemy:FindFirstChild("HumanoidRootPart") and enemy:FindFirstChildOfClass("Humanoid").Health ~= 0 do
+                        humanoidRootPart.CFrame = enemy.HumanoidRootPart.CFrame * CFrame.new(0,0,1)
+                        character:WaitForChild("Loki Dagger"):WaitForChild("ToolListnerEvent"):FireServer("Activate")
+                        task.wait(0.01)
+                    end
+                end
+            end
+        end
+    end
+    
+    -- Para ve RedPresent toplama işlemi
+    if humanoidRootPart then
+        for _, entity in pairs(workspace.Entities:GetChildren()) do
+            if entity.Name == "MoneyBag" or entity.Name == "RedPresent" then
+                local targetPosition = humanoidRootPart.Position
+                
+                -- Entity'i karakterin yanına ışınla
+                entity.CFrame = CFrame.new(targetPosition)
+                task.wait(0.05)
+                
+                -- Daha doğal hissettirmek için hafifçe yukarı taşı
+                entity.CFrame = entity.CFrame * CFrame.new(0, 50, 0)
+                task.wait(0.05)
+                
+                -- Tekrar karakterin konumuna getir
+                entity.CFrame = CFrame.new(targetPosition)
+                task.wait(0.1)
+            end
+        end
+    end
+    
+    task.wait(0.1)
+end
