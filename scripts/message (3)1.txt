@@ -1,0 +1,149 @@
+-- LocalPlayer (oyuncuyu) alıyoruz
+local player = game.Players.LocalPlayer  
+
+-- Mağazalara göre hedef konumlar
+local destinations = {
+    ["Furniture Store"] = Vector3.new(-645, 77, 282),
+    ["Sellzone"] = Vector3.new(1428, 0.5, 162),
+    ["Vi's Logics"] = Vector3.new(-5158, 60, -2864),
+    ["Abandoned Shop"] = Vector3.new(1951, 55, 1132),
+    ["Lush Shop"] = Vector3.new(2150, -470, -35),
+    ["Nova Ferry docks"] = Vector3.new(-388, 3, 1304),
+    ["Beach Shop"] = Vector3.new(2211, 3, -675)
+}
+
+-- Paketi bıraktıktan sonra geri dönüş konumu
+local returnPosition = Vector3.new(1882, 5, -124)
+
+-- Paketleri liste olarak alıyoruz
+local parts = {}
+local deliveryBoxes = workspace:FindFirstChild("Grab") and workspace.Grab:GetChildren()
+if deliveryBoxes then
+    for _, box in ipairs(deliveryBoxes) do
+        if box:IsA("Model") and box:FindFirstChild("Primary") then
+            table.insert(parts, box.Primary)
+        end
+    end
+end
+
+-- Hedef konumu belirleme fonksiyonu
+local function getTargetPosition(part)
+    if part and part:FindFirstChild("AddressGui") then
+        local textLabel = part.AddressGui:FindFirstChild("TextLabel")
+        if textLabel then
+            local targetText = textLabel.Text  -- Örnek: "To: <font color='rgb(0, 255, 255)'>Lush Shop</font>"
+
+            -- "<font ...>" içindeki mağaza adını çıkarmak için düzenli ifade kullanıyoruz
+            local targetName = targetText:match(">(.-)<")
+
+            -- Eğer hedef adı bulunursa, eşleşen koordinatı döndür
+            if targetName and destinations[targetName] then
+                return destinations[targetName]
+            end
+        end
+    end
+    return Vector3.new(0, 0, 0) -- Varsayılan konum
+end
+
+-- Nesneyi hedef konuma ışınlamak
+local function movePartToTargetPosition(part, targetPosition)
+    if part then
+        part.CFrame = CFrame.new(targetPosition)
+    end
+end
+
+-- Oyuncuyu nesneye ışınlamak
+local function teleportPlayerToPart(part)
+    local humanoidRootPart = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    if humanoidRootPart and part then
+        humanoidRootPart.CFrame = part.CFrame
+    end
+end
+
+-- Oyuncuyu hedef konuma ışınlamak
+local function teleportPlayerToTargetPosition(targetPosition)
+    local humanoidRootPart = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    if humanoidRootPart then
+        humanoidRootPart.CFrame = CFrame.new(targetPosition)
+    end
+end
+
+-- Oyuncuyu geri dönüş konumuna ışınlamak
+local function teleportPlayerToReturnPosition()
+    local humanoidRootPart = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+    if humanoidRootPart then
+        humanoidRootPart.CFrame = CFrame.new(returnPosition)
+    end
+end
+
+-- Geçerliliği kontrol etme
+local function isValidPart(part)
+    if part and part:IsA("BasePart") then
+        local owner = part:FindFirstChild("Owner")
+        if owner then
+            if owner.Value == "ck1234566" or owner.Value == player.Name then
+                return true  
+            end
+        else
+            return true  -- Eğer "Owner" yoksa, geçerli
+        end
+    end
+    return false  -- Geçersiz nesne
+end
+
+-- WoodPart'ları almak
+local function getWoodParts()
+    local woodParts = {}
+    for _, part in ipairs(workspace.Grab:GetChildren()) do
+        if part:IsA("Model") and part.Name:match("WoodPart") then  -- WoodPart adında olanları bul
+            local woodPart = part:FindFirstChild("Part")  -- İçindeki "Part" nesnesini al
+            if woodPart and not woodPart.Anchored then  -- Anchored değilse listeye ekle
+                table.insert(woodParts, woodPart)
+            end
+        end
+    end
+    return woodParts
+end
+
+-- Tüm WoodPart'ları hedef konuma ışınlama
+local function moveWoodPartsToTargetPosition()
+    local woodParts = getWoodParts()
+    if #woodParts > 0 then
+        for _, part in ipairs(woodParts) do
+            local targetPosition = getTargetPosition(part)  -- WoodPart için hedef konumu al
+            pcall(function()
+                part.CFrame = CFrame.new(targetPosition)  -- WoodPart'ı hedef konuma ışınla
+            end)
+        end
+    else
+        warn("Uyarı: Anchorsuz WoodPart bulunamadı!")
+    end
+end
+
+-- Nesneleri sırayla işleme fonksiyonu
+local function processParts(parts)
+    for _, part in ipairs(parts) do
+        if isValidPart(part) then
+            local targetPosition = getTargetPosition(part)
+            local success, err = pcall(function()
+                teleportPlayerToPart(part)  -- Oyuncuyu nesneye ışınla
+                movePartToTargetPosition(part, targetPosition)  -- Nesneyi hedef konuma ışınla
+                teleportPlayerToTargetPosition(targetPosition)  -- Oyuncuyu hedef konuma ışınla
+                wait(1)  -- Paketi bıraktıktan sonra biraz bekle
+                teleportPlayerToReturnPosition()  -- Oyuncuyu geri dönüş konumuna ışınla
+            end)
+            
+            if not success then
+                warn("Hata oluştu: " .. tostring(err))
+            end
+        else
+            warn("Geçersiz nesne veya 'Owner' uyumsuzluğu: " .. tostring(part))
+        end
+    end
+end
+
+-- WoodPart'ları hareket ettir
+moveWoodPartsToTargetPosition()
+
+-- Fonksiyonu çağırıyoruz
+processParts(parts)

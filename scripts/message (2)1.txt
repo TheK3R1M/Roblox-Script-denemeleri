@@ -1,0 +1,289 @@
+--==================================================
+-- KILL SWITCH
+--==================================================
+if _G.__ORB_BAG_CONTROLLER_RUNNING then
+	_G.__ORB_BAG_CONTROLLER_RUNNING = false
+	task.wait(0.25)
+end
+_G.__ORB_BAG_CONTROLLER_RUNNING = true
+
+--==================================================
+-- CONFIG
+--==================================================
+local TARGET_PLAYER_NAME = "ck1234566"
+local TARGET_TYPE = "Orb" -- "Orb" | "Bag" | "Both"
+_G.loop = true
+
+-- 🔁 PING SPAM
+local PING_SPAM_ENABLED = true
+local PING_SPAM_INTERVAL = 1.2
+
+--==================================================
+-- SERVICES
+--==================================================
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local PartyPing = ReplicatedStorage:WaitForChild("PartyPing")
+
+--==================================================
+-- SPAWN NAME MAP (SENİN VERDİĞİN İSİMLER)
+--==================================================
+local SPAWN_NAME_MAP = {
+	AltSpawn1 = "Crest Site",
+	AltSpawn2 = "Uptown Site",
+	AltSpawn3 = "Hilton Site",
+	AltSpawn4 = "Downtown Site",
+	AltSpawn5 = "Vertex Site",
+	AltSpawn6 = "Office Site",
+	AltSpawn7 = "Park Site",
+	AltSpawn8 = "Arch Site",
+	AltSpawn9 = "Townside Site",
+	AltSpawn10 = "Highrise Site",
+	AltSpawn11 = "Titan",
+	AltSpawn12 = "Eastside Bend",
+	AltSpawn13 = "Lowrise Site",
+	SpawnLocation = "Main Spawn"
+}
+
+--==================================================
+-- ORB COLOR PRIORITY (HSV – YAKIN TONLAR)
+--==================================================
+local ORB_COLOR_RANGES = {
+	Red = {priority = 1, ranges={{0.95,1},{0,0.05}}},
+	Yellow = {priority = 2, ranges={{0.12,0.18}}},
+	Aqua = {priority = 3, ranges={{0.45,0.55}}},
+	Purple = {priority = 4, ranges={{0.72,0.82}}},
+	Green = {priority = 5, ranges={{0.25,0.40}}},
+	White = {priority = 6, whiteness = 0.15},
+}
+
+local BAG_PRIORITY = {
+	Christmas = 1,
+	Halloween = 1,
+	Limited = 1,
+	Resplendent = 1,
+	Legendary = 2,
+	Epic = 3,
+	Rare = 4,
+}
+
+--==================================================
+-- UTILS
+--==================================================
+local function getTargetPlayer()
+	return Players:FindFirstChild(TARGET_PLAYER_NAME)
+end
+
+local function getHRP(player)
+	return player and player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+end
+
+local function distance(a,b)
+	return (a-b).Magnitude
+end
+
+--==================================================
+-- SPAWNLARI OKU + İSİM MAP'LE
+--==================================================
+local function getAllSpawns()
+	local list = {}
+	local folder = workspace:FindFirstChild("Map")
+		and workspace.Map:FindFirstChild("Spawns")
+		and workspace.Map.Spawns:FindFirstChild("Spawns")
+
+	if not folder then return list end
+
+	for _,obj in ipairs(folder:GetChildren()) do
+		local pos
+		if obj:IsA("BasePart") then
+			pos = obj.Position
+		elseif obj:IsA("Model") and obj.PrimaryPart then
+			pos = obj.PrimaryPart.Position
+		end
+
+		if pos then
+			table.insert(list, {
+				name = SPAWN_NAME_MAP[obj.Name] or obj.Name,
+				position = pos
+			})
+		end
+	end
+
+	return list
+end
+
+local function getClosestSpawn(pos)
+	local spawns = getAllSpawns()
+	local closest, minDist = nil, math.huge
+
+	for _,s in ipairs(spawns) do
+		local d = distance(pos, s.position)
+		if d < minDist then
+			minDist = d
+			closest = s.name
+		end
+	end
+
+	return closest or "Unknown"
+end
+
+--==================================================
+-- PART BUL
+--==================================================
+local function getTargetPart(obj)
+	if obj:IsA("BasePart") then return obj end
+	if obj:IsA("Model") then
+		if obj.PrimaryPart then return obj.PrimaryPart end
+		for _,v in ipairs(obj:GetDescendants()) do
+			if v:IsA("BasePart") then return v end
+		end
+	end
+end
+
+--==================================================
+-- BİNA İÇİ TESPİT
+--==================================================
+local function isInsideBuilding(pos)
+	local params = RaycastParams.new()
+	params.IgnoreWater = true
+
+	local dirs = {
+		Vector3.new(6,0,0),Vector3.new(-6,0,0),
+		Vector3.new(0,0,6),Vector3.new(0,0,-6),
+		Vector3.new(0,10,0)
+	}
+
+	local hit = 0
+	for _,d in ipairs(dirs) do
+		local r = workspace:Raycast(pos,d,params)
+		if r and r.Instance and r.Instance.CanCollide then
+			hit += 1
+		end
+	end
+	return hit >= 3
+end
+
+--==================================================
+-- ORB COLOR
+--==================================================
+local function getOrbColor3(orbScript)
+	local p = orbScript.Parent
+	if not p then return end
+	local part = p:IsA("BasePart") and p or p:FindFirstChildWhichIsA("BasePart", true)
+	return part and part.Color
+end
+
+local function getOrbPriority(color)
+	local h,s = Color3.toHSV(color)
+	if s <= ORB_COLOR_RANGES.White.whiteness then
+		return ORB_COLOR_RANGES.White.priority, "White"
+	end
+	for name,data in pairs(ORB_COLOR_RANGES) do
+		if data.ranges then
+			for _,r in ipairs(data.ranges) do
+				if h >= r[1] and h <= r[2] then
+					return data.priority, name
+				end
+			end
+		end
+	end
+end
+
+--==================================================
+-- TARGET INFO
+--==================================================
+local function getTargetInfo(obj)
+	local orb = obj:FindFirstChild("OrbScript", true)
+	if orb and TARGET_TYPE ~= "Bag" then
+		local c = getOrbColor3(orb)
+		if c then
+			local p,n = getOrbPriority(c)
+			if p then return "Orb", p, n end
+		end
+	end
+
+	local bag = obj:FindFirstChild("RealBagValues", true)
+	if bag and TARGET_TYPE ~= "Orb" then
+		for r,p in pairs(BAG_PRIORITY) do
+			if bag:FindFirstChild(r) then
+				return "Bag", p, r
+			end
+		end
+	end
+end
+
+--==================================================
+-- EN İYİ HEDEF
+--==================================================
+local function findBestTarget(player)
+	local hrp = getHRP(player)
+	if not hrp then return end
+
+	local best
+	for _,obj in ipairs(workspace:GetDescendants()) do
+		local kind,prio,label = getTargetInfo(obj)
+		if prio then
+			local part = getTargetPart(obj)
+			if part and not isInsideBuilding(part.Position) then
+				local d = distance(hrp.Position, part.Position)
+				if not best or prio < best.prio or (prio == best.prio and d < best.dist) then
+					best = {part=part, prio=prio, dist=d, kind=kind, label=label}
+				end
+			end
+		end
+	end
+	return best
+end
+
+--==================================================
+-- MAIN LOOP
+--==================================================
+task.spawn(function()
+	local current
+	local lastPing = 0
+
+	while _G.__ORB_BAG_CONTROLLER_RUNNING do
+		if _G.loop then
+			local plr = getTargetPlayer()
+			if plr then
+				local best = findBestTarget(plr)
+				local now = os.clock()
+
+				if best then
+					local switch =
+						not current
+						or best.prio < current.prio
+						or best.part ~= current.part
+
+					local spam =
+						PING_SPAM_ENABLED
+						and current
+						and best.part == current.part
+						and (now - lastPing) >= PING_SPAM_INTERVAL
+
+					if switch or spam then
+						current = best
+						lastPing = now
+						PartyPing:FireServer(best.part.Position, true)
+
+						if switch then
+							local spawn = getClosestSpawn(best.part.Position)
+							if best.kind == "Orb" then
+								print(string.format(
+									"[PING] ORB -> Color: %s | Priority: %d | Closest Spawn: %s",
+									best.label, best.prio, spawn
+								))
+							else
+								print(string.format(
+									"[PING] BAG -> Type: %s | Priority: %d | Closest Spawn: %s",
+									best.label, best.prio, spawn
+								))
+							end
+						end
+					end
+				end
+			end
+		end
+		task.wait(0.2)
+	end
+end)

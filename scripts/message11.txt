@@ -1,0 +1,158 @@
+--==================================================
+-- CONFIG
+--==================================================
+local TARGET_PLAYER_NAME = "ck1234566"
+_G.loop = true
+
+--==================================================
+-- SERVICES
+--==================================================
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local PartyPing = ReplicatedStorage:WaitForChild("PartyPing")
+
+--==================================================
+-- STATE
+--==================================================
+local currentTarget = nil
+local currentPingPos = nil
+local problemPingHandled = false
+
+--==================================================
+-- UTILS
+--==================================================
+local function getTargetPlayer()
+	return Players:FindFirstChild(TARGET_PLAYER_NAME)
+end
+
+local function getHRP(player)
+	return player
+		and player.Character
+		and player.Character:FindFirstChild("HumanoidRootPart")
+end
+
+local function distance(a, b)
+	return (a - b).Magnitude
+end
+
+--==================================================
+-- COLLECT ORBS + BAGS
+--==================================================
+local function collectTargets()
+	local list = {}
+
+	for _, obj in pairs(workspace:GetChildren()) do
+		if obj:IsA("Model") and obj.PrimaryPart then
+			if obj:FindFirstChild("OrbScript") or obj:FindFirstChild("RealBagValues") then
+				table.insert(list, obj)
+			end
+		end
+	end
+
+	if workspace:FindFirstChild("Map") then
+		for _, obj in pairs(workspace.Map:GetChildren()) do
+			if obj:IsA("Model") and obj.PrimaryPart and obj:FindFirstChild("RealBagValues") then
+				table.insert(list, obj)
+			end
+		end
+	end
+
+	return list
+end
+
+--==================================================
+-- FIND CLOSEST
+--==================================================
+local function findClosestTarget(targetPlayer, targets)
+	local hrp = getHRP(targetPlayer)
+	if not hrp then return nil end
+
+	local closest, minDist = nil, math.huge
+	for _, obj in pairs(targets) do
+		if obj and obj.Parent and obj.PrimaryPart then
+			local d = distance(hrp.Position, obj.PrimaryPart.Position)
+			if d < minDist then
+				minDist = d
+				closest = obj
+			end
+		end
+	end
+	return closest
+end
+
+--==================================================
+-- PING (TOGGLE)
+--==================================================
+local function setPing(pos)
+	PartyPing:FireServer(pos, true)
+	currentPingPos = pos
+end
+
+local function clearPing()
+	if currentPingPos then
+		PartyPing:FireServer(currentPingPos, true)
+		currentPingPos = nil
+	end
+end
+
+--==================================================
+-- TARGET PLAYER PROBLEM SIGNAL
+--==================================================
+local function targetPlayerPinged()
+	local pingFolder = workspace:FindFirstChild("RaycastIgnore")
+	if not pingFolder then return false end
+
+	local ping = pingFolder:FindFirstChild("Ping")
+	if not ping then return false end
+
+	local name = ping:FindFirstChild("PlrName")
+	if not name then return false end
+
+	return name.Value == TARGET_PLAYER_NAME
+end
+
+--==================================================
+-- CHECK TARGET GONE
+--==================================================
+local function isTargetGone(target)
+	return not target or not target.Parent or not target.PrimaryPart
+end
+
+--==================================================
+-- MAIN LOOP
+--==================================================
+task.spawn(function()
+	while true do
+		if _G.loop then
+			local targetPlayer = getTargetPlayer()
+			if targetPlayer then
+
+				-- 🔴 PROBLEM PING (SADECE 1 KERE)
+				if targetPlayerPinged() and not problemPingHandled then
+					clearPing()
+					currentTarget = nil
+					problemPingHandled = true
+				end
+
+				-- hedef alındıysa
+				if isTargetGone(currentTarget) then
+					clearPing()
+					currentTarget = nil
+				end
+
+				-- yeni hedef seç
+				if not currentTarget then
+					local targets = collectTargets()
+					currentTarget = findClosestTarget(targetPlayer, targets)
+
+					if currentTarget and currentTarget.PrimaryPart then
+						setPing(currentTarget.PrimaryPart.Position)
+						problemPingHandled = false -- 🔑 kilidi aç
+					end
+				end
+			end
+		end
+
+		task.wait(0.5)
+	end
+end)
