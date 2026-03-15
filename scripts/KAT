@@ -17,7 +17,7 @@ local RunService = game:GetService("RunService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 
 -- CONFIGURATION
-local SCRIPT_URL = "https://raw.github.com/TheK3R1M/Roblox-Script-denemeleri/new/main/scripts.txt" -- (OPTIONAL) PUT YOUR GITHUB/PASTEBIN RAW SCRIPT LINK HERE FOR 100% RELIABLE AUTO-EXECUTE BETWEEN SERVERS
+local SCRIPT_URL = "https://raw.githubusercontent.com/TheK3R1M/Roblox-Script-denemeleri/refs/heads/main/scripts/KAT?token=GHSAT0AAAAAADUJINNVQCKQKCHUQUWFA4NU2NXHERA" -- (OPTIONAL) PUT YOUR GITHUB/PASTEBIN RAW SCRIPT LINK HERE FOR 100% RELIABLE AUTO-EXECUTE BETWEEN SERVERS
 local TARGET_COORD = Vector3.new(0, -500, 0)
 local NON_DOMINANT_OFFSET = Vector3.new(0, 0, -3) -- 3 studs directly in front
 local CONFIG_FILE = "KAT_Sync_Config.json"
