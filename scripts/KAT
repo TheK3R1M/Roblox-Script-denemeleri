@@ -21,6 +21,14 @@ local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
 local RunService = game:GetService("RunService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
+local GuiService = game:GetService("GuiService")
+
+-- Automatically close Roblox error prompts (like "Teleport Failed") so it doesn't block gameplay
+GuiService.ErrorMessageChanged:Connect(function()
+    pcall(function()
+        GuiService:ClearError()
+    end)
+end)
 
 -- CONFIGURATION
 local SCRIPT_URL = "https://raw.githubusercontent.com/TheK3R1M/Roblox-Script-denemeleri/refs/heads/main/scripts/KAT?token=GHSAT0AAAAAADUJINNUQHOWVCW7FL6VNZXU2NXHTVA" -- (OPTIONAL) PUT YOUR GITHUB/PASTEBIN RAW SCRIPT LINK HERE FOR 100% RELIABLE AUTO-EXECUTE BETWEEN SERVERS
@@ -327,18 +335,49 @@ local function Main(StatusLabel)
         task.wait(1) -- Short delay after confirmed kill
         
         -- Coordinated Server Hop
-        StatusLabel.Text = "Choosing Server..."
-        local nextJobId = GetNextServer()
-        if nextJobId then
-            writefile(SYNC_FILE, HttpService:JSONEncode({JobId = nextJobId, Time = tick()}))
-            StatusLabel.Text = "Hopping..."
-            AutoInjectNextServer()
-            TeleportService:TeleportToPlaceInstance(PLACE_ID, nextJobId, LocalPlayer)
-        else
-            StatusLabel.Text = "Hop Failed! Retrying..."
-            task.wait(2)
-            Main(StatusLabel) -- loop back if unable to find server
+        local function AttemptHop()
+            StatusLabel.Text = "Choosing Server..."
+            local nextJobId = GetNextServer()
+            if nextJobId then
+                writefile(SYNC_FILE, HttpService:JSONEncode({JobId = nextJobId, Time = tick()}))
+                StatusLabel.Text = "Hopping..."
+                AutoInjectNextServer()
+                
+                -- Catch Roblox Teleport failures before kicking
+                local connection
+                connection = TeleportService.TeleportInitFailed:Connect(function()
+                    connection:Disconnect()
+                    StatusLabel.Text = "Teleport Failed! Retrying in 5s..."
+                    task.wait(5)
+                    AttemptHop()
+                end)
+
+                local tsSuccess, err = pcall(function()
+                    TeleportService:TeleportToPlaceInstance(PLACE_ID, nextJobId, LocalPlayer)
+                end)
+                
+                if not tsSuccess then
+                    connection:Disconnect()
+                    StatusLabel.Text = "Hop Execution Error! Retrying..."
+                    task.wait(2)
+                    AttemptHop()
+                end
+                
+                -- Timeout catch just in case it stalls silently
+                task.delay(15, function()
+                    if connection.Connected then
+                        connection:Disconnect()
+                        StatusLabel.Text = "Hop Timeout! Retrying..."
+                        AttemptHop()
+                    end
+                end)
+            else
+                StatusLabel.Text = "Hop Failed! Retrying..."
+                task.wait(2)
+                AttemptHop()
+            end
         end
+        AttemptHop()
 
     else
         StatusLabel.Text = "Waiting for Sync..."
@@ -352,12 +391,24 @@ local function Main(StatusLabel)
                 if success and data.JobId and (tick() - data.Time < 45) and data.JobId ~= game.JobId then
                     StatusLabel.Text = "Following to Server..."
                     AutoInjectNextServer()
+                    
+                    local connection
+                    connection = TeleportService.TeleportInitFailed:Connect(function()
+                        connection:Disconnect()
+                        StatusLabel.Text = "Follow Failed (Init)! Retrying..."
+                    end)
+
                     local tsSuccess, err = pcall(function()
                         TeleportService:TeleportToPlaceInstance(PLACE_ID, data.JobId, LocalPlayer)
                     end)
                     if not tsSuccess then
+                        if connection.Connected then connection:Disconnect() end
                         StatusLabel.Text = "Following Failed! Retrying..."
                     end
+                    task.delay(10, function()
+                        if connection.Connected then connection:Disconnect() end
+                    end)
+                    
                     task.wait(5) -- Wait before retrying if tp failed
                 end
             end
