@@ -387,8 +387,8 @@ local function Main(StatusLabel)
                 local success, data = pcall(function()
                     return HttpService:JSONDecode(readfile(SYNC_FILE))
                 end)
-                -- If the file was written recently and is a different server
-                if success and data.JobId and (tick() - data.Time < 45) and data.JobId ~= game.JobId then
+                -- If the file was written reasonably recently (10 mins) and is a different server
+                if success and data.JobId and (tick() - data.Time < 600) and data.JobId ~= game.JobId then
                     StatusLabel.Text = "Following to Server..."
                     AutoInjectNextServer()
                     
@@ -429,8 +429,8 @@ end)
 -- Auto Start check (If we have a valid recent sync file, we assume we just hopped, start automatically)
 if isfile(SYNC_FILE) then
     local success, data = pcall(function() return HttpService:JSONDecode(readfile(SYNC_FILE)) end)
-    -- If file was updated recently, assume we hopped and auto-start logic
-    if success and data.Time and (tick() - data.Time < 60) then
+    -- If file was updated within 3 mins, assume we hopped and auto-start logic
+    if success and data.Time and (tick() - data.Time < 180) then
         StartBtn.Visible = false
         Main(StatusLabel)
     end
