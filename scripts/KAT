@@ -265,37 +265,22 @@ local function Main(StatusLabel)
     task.wait(1)
 
     if Config.IsDominant then
-        StatusLabel.Text = "Waiting for Target..."
-        -- Wait for another player to come close (the Non-Dominant player)
-        local targetPlayer = nil
+        StatusLabel.Text = "Waiting for Targets..."
+        -- Wait for at least one other player to come close (the Non-Dominant players)
+        local targets = {}
         while true do
             for _, p in ipairs(Players:GetPlayers()) do
                 if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
                     local dist = (p.Character.HumanoidRootPart.Position - hrp.Position).Magnitude
                     if dist < 5 then
-                        targetPlayer = p
-                        break
+                        table.insert(targets, p)
                     end
                 end
             end
-            if targetPlayer then break end
+            if #targets > 0 then break end
             task.wait(0.1)
         end
 
-        StatusLabel.Text = "Waiting for ForceField..."
-        -- Wait until Spawn Invincibility (ForceField) is gone from both players
-        while true do
-            local myFF = character:FindFirstChildOfClass("ForceField")
-            local targetFF = targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChildOfClass("ForceField")
-            if not myFF and not targetFF then
-                break
-            end
-            task.wait(0.5)
-        end
-
-        StatusLabel.Text = "Performing Action..."
-        
-        -- Equip Knife properly via Humanoid
         local backpack = LocalPlayer:FindFirstChild("Backpack")
         if humanoid and backpack then
             for _, item in ipairs(backpack:GetChildren()) do
@@ -305,34 +290,56 @@ local function Main(StatusLabel)
                 end
             end
         end
-
         task.wait(1.5) -- Wait longer to ensure equip anim plays and weapon is ready
-
-        -- Virtual Click (center of screen)
         local viewportSize = workspace.CurrentCamera.ViewportSize
-        
-        -- Loop click until target is dead
-        StatusLabel.Text = "Attacking Target..."
-        local maxAttempts = 30 -- Increase max attempts to be safe
-        local attempts = 0
-        
-        while targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("Humanoid") and targetPlayer.Character.Humanoid.Health > 0 and attempts < maxAttempts do
+
+        for i, targetPlayer in ipairs(targets) do
+            if not targetPlayer or not targetPlayer.Character or not targetPlayer.Character:FindFirstChild("Humanoid") then
+                continue
+            end
+            if targetPlayer.Character.Humanoid.Health <= 0 then
+                continue 
+            end
+
+            StatusLabel.Text = "Waiting for ForceField ("..i.."/"..#targets..")"
+            -- Wait until Spawn Invincibility (ForceField) is gone from both players
+            while true do
+                local myFF = character:FindFirstChildOfClass("ForceField")
+                local targetFF = targetPlayer.Character:FindFirstChildOfClass("ForceField")
+                if not myFF and not targetFF then
+                    break
+                end
+                if targetPlayer.Character.Humanoid.Health <= 0 then
+                    break
+                end
+                task.wait(0.5)
+            end
+
+            -- Loop click until target is dead
+            StatusLabel.Text = "Attacking Target ("..i.."/"..#targets..")"
+            local maxAttempts = 30 -- Increase max attempts to be safe
+            local attempts = 0
             
-            -- Just fire the virtual click directly without forcing the camera
-            VirtualInputManager:SendMouseButtonEvent(viewportSize.X / 2, viewportSize.Y / 2, 0, true, game, 0)
-            task.wait(0.1)
-            VirtualInputManager:SendMouseButtonEvent(viewportSize.X / 2, viewportSize.Y / 2, 0, false, game, 0)
-            task.wait(0.5)
-            attempts = attempts + 1
+            while targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("Humanoid") and targetPlayer.Character.Humanoid.Health > 0 and attempts < maxAttempts do
+                
+                -- Support aiming locally if preferred
+                hrp.CFrame = CFrame.new(hrp.Position, Vector3.new(targetPlayer.Character.HumanoidRootPart.Position.X, hrp.Position.Y, targetPlayer.Character.HumanoidRootPart.Position.Z))
+
+                -- Just fire the virtual click directly without forcing the camera
+                VirtualInputManager:SendMouseButtonEvent(viewportSize.X / 2, viewportSize.Y / 2, 0, true, game, 0)
+                task.wait(0.1)
+                VirtualInputManager:SendMouseButtonEvent(viewportSize.X / 2, viewportSize.Y / 2, 0, false, game, 0)
+                task.wait(0.5)
+                attempts = attempts + 1
+            end
+            
+            if attempts >= maxAttempts then
+                StatusLabel.Text = "Kill Timeout ("..i..")!"
+            else
+                StatusLabel.Text = "Target Defeated ("..i..")!"
+            end
+            task.wait(1) -- Short delay after confirmed kill
         end
-        
-        if attempts >= maxAttempts then
-            StatusLabel.Text = "Kill Timeout! Hopping anyway..."
-        else
-            StatusLabel.Text = "Target Defeated!"
-        end
-        
-        task.wait(1) -- Short delay after confirmed kill
         
         -- Coordinated Server Hop
         local function AttemptHop()
