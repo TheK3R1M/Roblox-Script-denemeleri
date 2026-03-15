@@ -232,6 +232,32 @@ local function Main(StatusLabel)
         task.wait(0.5)
     end
 
+    -- GAMEMODE CHECK
+    local gamemodeVal = workspace:FindFirstChild("Gamemode")
+    if gamemodeVal and gamemodeVal:IsA("StringValue") and gamemodeVal.Value ~= "Classic" then
+        StatusLabel.Text = "Gamemode is " .. tostring(gamemodeVal.Value) .. "... Skipping server!"
+        task.wait(2)
+        if Config.IsDominant then
+            -- Skip directly to Server Hop
+            local nextJobId = GetNextServer()
+            if nextJobId then
+                writefile(SYNC_FILE, HttpService:JSONEncode({JobId = nextJobId, Time = tick()}))
+                StatusLabel.Text = "Hopping from wrong mode..."
+                AutoInjectNextServer()
+                TeleportService:TeleportToPlaceInstance(PLACE_ID, nextJobId, LocalPlayer)
+            else
+                StatusLabel.Text = "Hop Failed! Retrying..."
+                task.wait(2)
+                Main(StatusLabel)
+            end
+        else
+            -- Non-dominant just waits for the new sync file as usual
+            StatusLabel.Text = "Waiting for Dominant skip..."
+        end
+        -- Return early so we don't execute combat logic
+        return
+    end
+
     StatusLabel.Text = "Teleporting..."
     CreatePlatform()
     
@@ -293,15 +319,23 @@ local function Main(StatusLabel)
         
         while targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("Humanoid") and targetPlayer.Character.Humanoid.Health > 0 and attempts < maxAttempts do
             
-            -- Re-aim camera every tick just in case
+            -- Re-orient the character towards the target silently instead of hijacking the player's camera
             if targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                workspace.CurrentCamera.CFrame = CFrame.new(workspace.CurrentCamera.CFrame.Position, targetPlayer.Character.HumanoidRootPart.Position)
+                hrp.CFrame = CFrame.new(hrp.Position, Vector3.new(targetPlayer.Character.HumanoidRootPart.Position.X, hrp.Position.Y, targetPlayer.Character.HumanoidRootPart.Position.Z))
+            end
+            
+            -- Try native tool activation
+            local equippedTool = character:FindFirstChildOfClass("Tool")
+            if equippedTool then
+                equippedTool:Activate()
             end
 
+            -- Faster Virtual Click (0.05s) so it doesn't count as holding down the mouse
             VirtualInputManager:SendMouseButtonEvent(viewportSize.X / 2, viewportSize.Y / 2, 0, true, game, 0)
-            task.wait(0.1)
+            task.wait(0.05)
             VirtualInputManager:SendMouseButtonEvent(viewportSize.X / 2, viewportSize.Y / 2, 0, false, game, 0)
-            task.wait(0.5)
+            
+            task.wait(0.4)
             attempts = attempts + 1
         end
         
