@@ -10,7 +10,13 @@
 ]]
 
 local Players = game:GetService("Players")
+
+-- Wait for LocalPlayer to load if running in autoexec early injection
+while not Players.LocalPlayer do
+    task.wait(0.1)
+end
 local LocalPlayer = Players.LocalPlayer
+
 local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
 local RunService = game:GetService("RunService")
@@ -20,7 +26,7 @@ local VirtualInputManager = game:GetService("VirtualInputManager")
 local SCRIPT_URL = "https://raw.githubusercontent.com/TheK3R1M/Roblox-Script-denemeleri/refs/heads/main/scripts/KAT?token=GHSAT0AAAAAADUJINNUQHOWVCW7FL6VNZXU2NXHTVA" -- (OPTIONAL) PUT YOUR GITHUB/PASTEBIN RAW SCRIPT LINK HERE FOR 100% RELIABLE AUTO-EXECUTE BETWEEN SERVERS
 local TARGET_COORD = Vector3.new(0, -500, 0)
 local NON_DOMINANT_OFFSET = Vector3.new(0, 0, -3) -- 3 studs directly in front
-local CONFIG_FILE = "KAT_Sync_Config.json"
+local CONFIG_FILE = "KAT_Sync_Config_" .. tostring(LocalPlayer.Name) .. ".json"
 local SYNC_FILE = "KAT_Target_Server.json"
 local PLACE_ID = game.PlaceId
 
@@ -293,11 +299,7 @@ local function Main(StatusLabel)
         
         while targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("Humanoid") and targetPlayer.Character.Humanoid.Health > 0 and attempts < maxAttempts do
             
-            -- Re-aim camera every tick just in case
-            if targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                workspace.CurrentCamera.CFrame = CFrame.new(workspace.CurrentCamera.CFrame.Position, targetPlayer.Character.HumanoidRootPart.Position)
-            end
-
+            -- Just fire the virtual click directly without forcing the camera
             VirtualInputManager:SendMouseButtonEvent(viewportSize.X / 2, viewportSize.Y / 2, 0, true, game, 0)
             task.wait(0.1)
             VirtualInputManager:SendMouseButtonEvent(viewportSize.X / 2, viewportSize.Y / 2, 0, false, game, 0)
