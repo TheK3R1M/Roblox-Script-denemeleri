@@ -1,0 +1,373 @@
+--[[
+    KAT CO-OP SYNC SCRIPT - V2 (Refined)
+    Features:
+    - Dominant/Non-Dominant Role Selection (via GUI)
+    - Local Persistence (saves choice)
+    - Underground Teleportation (0, -500, 0)
+    - Anti-Fall Platform
+    - Precise Facing & Camera Aim for Action
+    - Coordinated Server Hopping (JobId Sharing)
+]]
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local RunService = game:GetService("RunService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+-- CONFIGURATION
+local SCRIPT_URL = "https://raw.github.com/TheK3R1M/Roblox-Script-denemeleri/new/main/scripts.txt" -- (OPTIONAL) PUT YOUR GITHUB/PASTEBIN RAW SCRIPT LINK HERE FOR 100% RELIABLE AUTO-EXECUTE BETWEEN SERVERS
+local TARGET_COORD = Vector3.new(0, -500, 0)
+local NON_DOMINANT_OFFSET = Vector3.new(0, 0, -3) -- 3 studs directly in front
+local CONFIG_FILE = "KAT_Sync_Config.json"
+local SYNC_FILE = "KAT_Target_Server.json"
+local PLACE_ID = game.PlaceId
+
+-- STATE
+local Config = {
+    IsDominant = false
+}
+
+-- LOAD CONFIG
+local function LoadConfig()
+    if isfile(CONFIG_FILE) then
+        local success, decrypted = pcall(function()
+            return HttpService:JSONDecode(readfile(CONFIG_FILE))
+        end)
+        if success then Config = decrypted end
+    end
+end
+
+-- SAVE CONFIG
+local function SaveConfig()
+    writefile(CONFIG_FILE, HttpService:JSONEncode(Config))
+end
+
+-- GUI IMPLEMENTATION
+local function CreateGUI()
+    local ScreenGui = Instance.new("ScreenGui")
+    local MainFrame = Instance.new("Frame")
+    local Title = Instance.new("TextLabel")
+    local ToggleBtn = Instance.new("TextButton")
+    local StatusLabel = Instance.new("TextLabel")
+    local UICorner = Instance.new("UICorner")
+    local UIStroke = Instance.new("UIStroke")
+
+    ScreenGui.Name = "KAT_Sync_GUI"
+    ScreenGui.Parent = game.CoreGui
+    ScreenGui.ResetOnSpawn = false
+
+    MainFrame.Name = "MainFrame"
+    MainFrame.Parent = ScreenGui
+    MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    MainFrame.Position = UDim2.new(0.5, -100, 0.5, -75)
+    MainFrame.Size = UDim2.new(0, 200, 0, 150)
+    MainFrame.Active = true
+    MainFrame.Draggable = true
+
+    UICorner.Parent = MainFrame
+    UIStroke.Parent = MainFrame
+    UIStroke.Color = Color3.fromRGB(138, 43, 226)
+    UIStroke.Thickness = 2
+
+    Title.Name = "Title"
+    Title.Parent = MainFrame
+    Title.BackgroundTransparency = 1
+    Title.Size = UDim2.new(1, 0, 0.3, 0)
+    Title.Font = Enum.Font.GothamBold
+    Title.Text = "KAT SYNC"
+    Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Title.TextSize = 20
+
+    ToggleBtn.Name = "ToggleBtn"
+    ToggleBtn.Parent = MainFrame
+    ToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    ToggleBtn.Position = UDim2.new(0.1, 0, 0.4, 0)
+    ToggleBtn.Size = UDim2.new(0.8, 0, 0.3, 0)
+    ToggleBtn.Font = Enum.Font.Gotham
+    ToggleBtn.Text = Config.IsDominant and "ROLE: DOMINANT" or "ROLE: NON-DOMINANT"
+    ToggleBtn.TextColor3 = Config.IsDominant and Color3.fromRGB(0, 255, 127) or Color3.fromRGB(255, 69, 0)
+    ToggleBtn.TextSize = 14
+    local btnCorner = Instance.new("UICorner", ToggleBtn)
+
+    local StartBtn = Instance.new("TextButton")
+    
+    StartBtn.Name = "StartBtn"
+    StartBtn.Parent = MainFrame
+    StartBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+    StartBtn.Position = UDim2.new(0.1, 0, 0.75, 0)
+    StartBtn.Size = UDim2.new(0.8, 0, 0.2, 0)
+    StartBtn.Font = Enum.Font.GothamBold
+    StartBtn.Text = "START SYNC"
+    StartBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    StartBtn.TextSize = 14
+    local startCorner = Instance.new("UICorner", StartBtn)
+
+    StatusLabel.Name = "StatusLabel"
+    StatusLabel.Parent = MainFrame
+    StatusLabel.BackgroundTransparency = 1
+    StatusLabel.Position = UDim2.new(0, 0, 1, 0)
+    StatusLabel.Size = UDim2.new(1, 0, 0.2, 0)
+    StatusLabel.Font = Enum.Font.Gotham
+    StatusLabel.Text = "Waiting to Start..."
+    StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+    StatusLabel.TextSize = 12
+
+    ToggleBtn.MouseButton1Click:Connect(function()
+        Config.IsDominant = not Config.IsDominant
+        ToggleBtn.Text = Config.IsDominant and "ROLE: DOMINANT" or "ROLE: NON-DOMINANT"
+        ToggleBtn.TextColor3 = Config.IsDominant and Color3.fromRGB(0, 255, 127) or Color3.fromRGB(255, 69, 0)
+        SaveConfig()
+    end)
+
+    return StatusLabel, StartBtn
+end
+
+
+-- UTILS
+local function CreatePlatform()
+    local platform = Instance.new("Part")
+    platform.Name = "SyncPlatform"
+    platform.Size = Vector3.new(20, 1, 20)
+    platform.Position = TARGET_COORD - Vector3.new(0, 5, 0)
+    platform.Anchored = true
+    platform.Parent = workspace
+    return platform
+end
+
+local function GetNextServer()
+    -- Attempt 1: Using a known proxy (roproxy)
+    -- Changed sortOrder to Asc (Ascending) so we get the emptiest servers first.
+    local url = "https://games.roproxy.com/v1/games/" .. PLACE_ID .. "/servers/Public?sortOrder=Asc&limit=100"
+    local success, raw = pcall(function() return game:HttpGet(url) end)
+    
+    -- Attempt 2: Direct Roblox API (if executor allows it)
+    if not success or not raw or raw:find("err") then
+        url = "https://games.roblox.com/v1/games/" .. PLACE_ID .. "/servers/Public?sortOrder=Asc&limit=100"
+        success, raw = pcall(function() return game:HttpGet(url) end)
+    end
+
+    if not success then 
+        warn("KAT SYNC: Failed to fetch server list HTTP error.")
+        return nil 
+    end
+
+    local decodeSuccess, data = pcall(function() return HttpService:JSONDecode(raw) end)
+    if not decodeSuccess or not data or not data.data then 
+        warn("KAT SYNC: Failed to decode JSON or invalid format.")
+        return nil 
+    end
+    
+    for _, server in ipairs(data.data) do
+        -- Ensure server is very empty (less than 5 players), has at least 2 empty slots, and is not the current server
+        -- Allow 0 players if the server is valid, but usually we look for < 5
+        if server.playing and server.maxPlayers and server.playing < 5 and (server.maxPlayers - server.playing >= 2) and server.id ~= game.JobId then
+            return server.id
+        end
+    end
+    
+    warn("KAT SYNC: No suitable server found in the list.")
+    return nil
+end
+
+-- QUEUE ON TELEPORT (Ensures script runs in new server)
+local TeleportHooked = false
+local function AutoInjectNextServer()
+    if TeleportHooked then return end
+    TeleportHooked = true
+    
+    local queueFunction = syn and syn.queue_on_teleport or queue_on_teleport or (fluxus and fluxus.queue_on_teleport)
+    if queueFunction then
+        
+        -- Hooking this specifically on teleport prevents executors from clearing the queue too early
+        LocalPlayer.OnTeleport:Connect(function(State)
+            pcall(function()
+                if SCRIPT_URL and SCRIPT_URL ~= "" then
+                    -- This is literally what Infinite Yield uses:
+                    queueFunction("loadstring(game:HttpGet('" .. SCRIPT_URL .. "'))()")
+                else
+                    queueFunction([[
+                        task.wait(3)
+                        
+                        local loaded = false
+                        -- The exact names the script might be saved as in the exploit workspace
+                        local possibleNames = {"KAT_Sync_Script.lua", "KAT.lua", "sync.lua", "kat_sync.lua", "autoexec.lua"}
+                        
+                        for _, name in ipairs(possibleNames) do
+                            if isfile(name) then
+                                local src = readfile(name)
+                                -- Verify it's actually our script by checking a unique string
+                                if src:find("KAT CO%-OP SYNC SCRIPT") then
+                                    local s, err = pcall(function() loadstring(src)() end)
+                                    if s then loaded = true break end
+                                end
+                            end
+                        end
+                        
+                        if not loaded then
+                            warn("KAT SYNC ERROR: I couldn't find my own file to auto-execute!")
+                            warn("SOLUTION: You must put a link in SCRIPT_URL or put the file in autoexec.")
+                        end
+                    ]])
+                end
+            end)
+        end)
+    end
+end
+
+-- LOGIC
+local function Main(StatusLabel)
+    StatusLabel.Text = "Waiting for Spawn..."
+    
+    -- Wait for spawn
+    while true do
+        local character = LocalPlayer.Character
+        if character and character:FindFirstChild("HumanoidRootPart") then
+            local spawnedVal = workspace:FindFirstChild(LocalPlayer.Name) and workspace[LocalPlayer.Name]:FindFirstChild("HasSpawned")
+            if spawnedVal and spawnedVal.Value == true then
+                break
+            end
+        end
+        task.wait(0.5)
+    end
+
+    StatusLabel.Text = "Teleporting..."
+    CreatePlatform()
+    
+    local character = LocalPlayer.Character
+    local hrp = character.HumanoidRootPart
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+
+    -- Teleport and make players face each other
+    if Config.IsDominant then
+        -- Dominant faces the spot where Non-Dominant will be
+        hrp.CFrame = CFrame.new(TARGET_COORD, TARGET_COORD + NON_DOMINANT_OFFSET)
+    else
+        -- Non-dominant stands 3 studs in front and faces the Dominant
+        hrp.CFrame = CFrame.new(TARGET_COORD + NON_DOMINANT_OFFSET, TARGET_COORD)
+    end
+
+    task.wait(1)
+
+    if Config.IsDominant then
+        StatusLabel.Text = "Waiting for Target..."
+        -- Wait for another player to come close (the Non-Dominant player)
+        local targetPlayer = nil
+        while true do
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                    local dist = (p.Character.HumanoidRootPart.Position - hrp.Position).Magnitude
+                    if dist < 5 then
+                        targetPlayer = p
+                        break
+                    end
+                end
+            end
+            if targetPlayer then break end
+            task.wait(0.1)
+        end
+
+        StatusLabel.Text = "Performing Action..."
+        
+        -- Equip Knife properly via Humanoid
+        local backpack = LocalPlayer:FindFirstChild("Backpack")
+        if humanoid and backpack then
+            for _, item in ipairs(backpack:GetChildren()) do
+                if item.Name:lower():find("knife") or item:IsA("Tool") then
+                    humanoid:EquipTool(item)
+                    break
+                end
+            end
+        end
+
+        task.wait(1.5) -- Wait longer to ensure equip anim plays and weapon is ready
+
+        -- Virtual Click (center of screen)
+        local viewportSize = workspace.CurrentCamera.ViewportSize
+        
+        -- Loop click until target is dead
+        StatusLabel.Text = "Attacking Target..."
+        local maxAttempts = 30 -- Increase max attempts to be safe
+        local attempts = 0
+        
+        while targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("Humanoid") and targetPlayer.Character.Humanoid.Health > 0 and attempts < maxAttempts do
+            
+            -- Re-aim camera every tick just in case
+            if targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                workspace.CurrentCamera.CFrame = CFrame.new(workspace.CurrentCamera.CFrame.Position, targetPlayer.Character.HumanoidRootPart.Position)
+            end
+
+            VirtualInputManager:SendMouseButtonEvent(viewportSize.X / 2, viewportSize.Y / 2, 0, true, game, 0)
+            task.wait(0.1)
+            VirtualInputManager:SendMouseButtonEvent(viewportSize.X / 2, viewportSize.Y / 2, 0, false, game, 0)
+            task.wait(0.5)
+            attempts = attempts + 1
+        end
+        
+        if attempts >= maxAttempts then
+            StatusLabel.Text = "Kill Timeout! Hopping anyway..."
+        else
+            StatusLabel.Text = "Target Defeated!"
+        end
+        
+        task.wait(1) -- Short delay after confirmed kill
+        
+        -- Coordinated Server Hop
+        StatusLabel.Text = "Choosing Server..."
+        local nextJobId = GetNextServer()
+        if nextJobId then
+            writefile(SYNC_FILE, HttpService:JSONEncode({JobId = nextJobId, Time = tick()}))
+            StatusLabel.Text = "Hopping..."
+            AutoInjectNextServer()
+            TeleportService:TeleportToPlaceInstance(PLACE_ID, nextJobId, LocalPlayer)
+        else
+            StatusLabel.Text = "Hop Failed! Retrying..."
+            task.wait(2)
+            Main(StatusLabel) -- loop back if unable to find server
+        end
+
+    else
+        StatusLabel.Text = "Waiting for Sync..."
+        -- Poll for server change
+        while true do
+            if isfile(SYNC_FILE) then
+                local success, data = pcall(function()
+                    return HttpService:JSONDecode(readfile(SYNC_FILE))
+                end)
+                -- If the file was written recently (within last 30 secs)
+                if success and data.JobId and (tick() - data.Time < 45) then
+                    StatusLabel.Text = "Following to Server..."
+                    AutoInjectNextServer()
+                    local tsSuccess, err = pcall(function()
+                        TeleportService:TeleportToPlaceInstance(PLACE_ID, data.JobId, LocalPlayer)
+                    end)
+                    if not tsSuccess then
+                        StatusLabel.Text = "Following Failed! Retrying..."
+                    end
+                    task.wait(5) -- Wait before retrying if tp failed
+                end
+            end
+            task.wait(1)
+        end
+    end
+end
+
+-- Initialization
+LoadConfig()
+local StatusLabel, StartBtn = CreateGUI()
+
+StartBtn.MouseButton1Click:Connect(function()
+    StartBtn.Visible = false
+    Main(StatusLabel)
+end)
+
+-- Auto Start check (If we have a valid recent sync file, we assume we just hopped, start automatically)
+if isfile(SYNC_FILE) then
+    local success, data = pcall(function() return HttpService:JSONDecode(readfile(SYNC_FILE)) end)
+    -- If file was updated recently, assume we hopped and auto-start logic
+    if success and data.Time and (tick() - data.Time < 60) then
+        StartBtn.Visible = false
+        Main(StatusLabel)
+    end
+end
