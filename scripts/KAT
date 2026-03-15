@@ -274,6 +274,17 @@ local function Main(StatusLabel)
             task.wait(0.1)
         end
 
+        StatusLabel.Text = "Waiting for ForceField..."
+        -- Wait until Spawn Invincibility (ForceField) is gone from both players
+        while true do
+            local myFF = character:FindFirstChildOfClass("ForceField")
+            local targetFF = targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChildOfClass("ForceField")
+            if not myFF and not targetFF then
+                break
+            end
+            task.wait(0.5)
+        end
+
         StatusLabel.Text = "Performing Action..."
         
         -- Equip Knife properly via Humanoid
@@ -337,8 +348,8 @@ local function Main(StatusLabel)
                 local success, data = pcall(function()
                     return HttpService:JSONDecode(readfile(SYNC_FILE))
                 end)
-                -- If the file was written recently (within last 30 secs)
-                if success and data.JobId and (tick() - data.Time < 45) then
+                -- If the file was written recently and is a different server
+                if success and data.JobId and (tick() - data.Time < 45) and data.JobId ~= game.JobId then
                     StatusLabel.Text = "Following to Server..."
                     AutoInjectNextServer()
                     local tsSuccess, err = pcall(function()
