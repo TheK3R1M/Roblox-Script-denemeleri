@@ -56,6 +56,7 @@ GuiService.ErrorMessageChanged:Connect(function()
 end)
 
 -- CONFIGURATION
+local SessionStartTime = os.time()
 local SCRIPT_URL = "https://raw.githubusercontent.com/TheK3R1M/Roblox-Script-denemeleri/refs/heads/main/scripts/KAT" -- (OPTIONAL) PUT YOUR GITHUB/PASTEBIN RAW SCRIPT LINK HERE FOR 100% RELIABLE AUTO-EXECUTE BETWEEN SERVERS
 local TARGET_COORD = Vector3.new(0, -500, 0)
 local NON_DOMINANT_OFFSET = Vector3.new(0, 0, -3) -- 3 studs directly in front
@@ -709,8 +710,8 @@ local function Main(StatusLabel, GemLabel)
                 local success, data = pcall(function()
                     return HttpService:JSONDecode(readfile(SYNC_FILE))
                 end)
-                -- If the file was written reasonably recently (10 mins) and is a different server
-                if success and data.JobId and (os.time() - data.Time < 600) and data.JobId ~= game.JobId then
+                -- If the file was written after this script session started and is a different server
+                if success and data.JobId and data.Time and data.Time > (SessionStartTime - 10) and data.JobId ~= game.JobId then
                     StatusLabel.Text = "Following to Server..."
                     AutoInjectNextServer()
                     
