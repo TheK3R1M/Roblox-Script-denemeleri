@@ -12,7 +12,7 @@
 local Players = game:GetService("Players")
 
 -- Clean up old instances or prevent double execution
-local existingGui = game.CoreGui:FindFirstChild("KAT_Sync_GUI")
+local existingGui = game.CoreGui:FindFirstChild("KAT_Sync_GUI") -- clean up old instances or prevent double execution   
 if existingGui then
     local jobIdTag = existingGui:FindFirstChild("JobIdTag")
     if jobIdTag and jobIdTag.Value == game.JobId then
@@ -202,15 +202,39 @@ local function CreateGUI()
     StartBtn.TextSize = 14
     local startCorner = Instance.new("UICorner", StartBtn)
 
+    local StatsFrame = Instance.new("Frame")
+    StatsFrame.Name = "StatsFrame"
+    StatsFrame.Parent = MainFrame
+    StatsFrame.BackgroundTransparency = 1
+    StatsFrame.Position = UDim2.new(0, 0, 1, 5)
+    StatsFrame.Size = UDim2.new(1, 0, 0.4, 0)
+
+    local UIListLayout = Instance.new("UIListLayout")
+    UIListLayout.Parent = StatsFrame
+    UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    UIListLayout.Padding = UDim.new(0, 5)
+    UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
     StatusLabel.Name = "StatusLabel"
-    StatusLabel.Parent = MainFrame
+    StatusLabel.Parent = StatsFrame
     StatusLabel.BackgroundTransparency = 1
-    StatusLabel.Position = UDim2.new(0, 0, 1, 0)
-    StatusLabel.Size = UDim2.new(1, 0, 0.2, 0)
+    StatusLabel.Size = UDim2.new(1, 0, 0.5, 0)
     StatusLabel.Font = Enum.Font.Gotham
     StatusLabel.Text = "Waiting to Start..."
     StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
     StatusLabel.TextSize = 12
+    StatusLabel.LayoutOrder = 1
+
+    local GemLabel = Instance.new("TextLabel")
+    GemLabel.Name = "GemLabel"
+    GemLabel.Parent = StatsFrame
+    GemLabel.BackgroundTransparency = 1
+    GemLabel.Size = UDim2.new(1, 0, 0.5, 0)
+    GemLabel.Font = Enum.Font.GothamBold
+    GemLabel.Text = "💎 Farmed: " .. tostring(Config.SessionGems)
+    GemLabel.TextColor3 = Color3.fromRGB(0, 255, 255)
+    GemLabel.TextSize = 13
+    GemLabel.LayoutOrder = 2
 
     ToggleBtn.MouseButton1Click:Connect(function()
         Config.IsDominant = not Config.IsDominant
@@ -218,17 +242,6 @@ local function CreateGUI()
         ToggleBtn.TextColor3 = Config.IsDominant and Color3.fromRGB(0, 255, 127) or Color3.fromRGB(255, 69, 0)
         SaveConfig()
     end)
-
-    local GemLabel = Instance.new("TextLabel")
-    GemLabel.Name = "GemLabel"
-    GemLabel.Parent = MainFrame
-    GemLabel.BackgroundTransparency = 1
-    GemLabel.Position = UDim2.new(0, 0, 1.25, 0)
-    GemLabel.Size = UDim2.new(1, 0, 0.2, 0)
-    GemLabel.Font = Enum.Font.GothamBold
-    GemLabel.Text = "💎 Farmed: " .. tostring(Config.SessionGems)
-    GemLabel.TextColor3 = Color3.fromRGB(0, 255, 255)
-    GemLabel.TextSize = 12
 
     return StatusLabel, StartBtn, GemLabel
 end
@@ -457,15 +470,27 @@ local function Main(StatusLabel, GemLabel)
         end
 
         local backpack = LocalPlayer:FindFirstChild("Backpack")
-        if humanoid and backpack then
-            for _, item in ipairs(backpack:GetChildren()) do
-                if item.Name:lower():find("knife") or item:IsA("Tool") then
-                    humanoid:EquipTool(item)
-                    break
+        local function EnsureKnifeEquipped()
+            -- Force re-evaluate humanoid and backpack in case of resets
+            local h = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if not h then return false end
+            
+            -- If already holding a tool (hopefully knife), we are good
+            local currentTool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
+            if currentTool then return true end
+            
+            local bp = LocalPlayer:FindFirstChild("Backpack")
+            if h and bp then
+                for _, item in ipairs(bp:GetChildren()) do
+                    if item.Name:lower():find("knife") or item:IsA("Tool") then
+                        pcall(function() h:EquipTool(item) end)
+                        return true
+                    end
                 end
             end
+            return false
         end
-        task.wait(1.5) -- Wait longer to ensure equip anim plays and weapon is ready
+
         local viewportSize = workspace.CurrentCamera.ViewportSize
 
         for i, targetPlayer in ipairs(targets) do
@@ -508,6 +533,9 @@ local function Main(StatusLabel, GemLabel)
             local attempts = 0
             
             while targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("Humanoid") and targetPlayer.Character.Humanoid.Health > 0 and attempts < maxAttempts do
+                
+                -- Aggressive Knife Equip Loop to guarantee it doesn't unequip
+                EnsureKnifeEquipped()
                 
                 -- Support aiming locally if preferred
                 hrp.CFrame = CFrame.new(hrp.Position, Vector3.new(targetPlayer.Character.HumanoidRootPart.Position.X, hrp.Position.Y, targetPlayer.Character.HumanoidRootPart.Position.Z))
