@@ -126,7 +126,7 @@ local function UpdateClientPresence()
         end
         clients[LocalPlayer.Name] = {
             Role = Config.IsDominant and "Dominant" or "NonDominant",
-            LastSeen = tick()
+            LastSeen = os.time()
         }
         pcall(function() writefile(CLIENTS_FILE, HttpService:JSONEncode(clients)) end)
     end)
@@ -142,7 +142,7 @@ local function GetActiveNonDominants()
     end
     local count = 0
     for name, data in pairs(clients) do
-        if data.Role == "NonDominant" and (tick() - data.LastSeen < 15) then
+        if data.Role == "NonDominant" and (os.time() - data.LastSeen < 15) then
             count = count + 1
         end
     end
@@ -320,7 +320,7 @@ local function GetNextServer()
     end
     
     if #validServers > 0 then
-        math.randomseed(tick())
+        math.randomseed(os.time())
         local chosen = validServers[math.random(1, #validServers)]
         return chosen
     end
@@ -644,7 +644,7 @@ local function Main(StatusLabel, GemLabel)
             if nextJobId then
                 -- Only write the file if we are picking a new server, not retrying an existing one
                 if not forcedJobId then
-                    writefile(SYNC_FILE, HttpService:JSONEncode({JobId = nextJobId, Time = tick()}))
+                    writefile(SYNC_FILE, HttpService:JSONEncode({JobId = nextJobId, Time = os.time()}))
                 end
                 StatusLabel.Text = "Hopping..."
                 AutoInjectNextServer()
@@ -710,7 +710,7 @@ local function Main(StatusLabel, GemLabel)
                     return HttpService:JSONDecode(readfile(SYNC_FILE))
                 end)
                 -- If the file was written reasonably recently (10 mins) and is a different server
-                if success and data.JobId and (tick() - data.Time < 600) and data.JobId ~= game.JobId then
+                if success and data.JobId and (os.time() - data.Time < 600) and data.JobId ~= game.JobId then
                     StatusLabel.Text = "Following to Server..."
                     AutoInjectNextServer()
                     
@@ -773,8 +773,8 @@ end)
 -- Auto Start check (If we have a valid recent sync file, we assume we just hopped, start automatically)
 if isfile(SYNC_FILE) then
     local success, data = pcall(function() return HttpService:JSONDecode(readfile(SYNC_FILE)) end)
-    -- If file was updated within 3 mins, assume we hopped and auto-start logic
-    if success and data.Time and (tick() - data.Time < 180) then
+    -- If file was updated within 10 mins, OR we landed in the exact same JobId
+    if success and data.Time and ((os.time() - data.Time < 600) or tostring(game.JobId) == tostring(data.JobId)) then
         scriptState.Stopped = false
         StartBtn.Text = "STOP SYNC"
         StartBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
