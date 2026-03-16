@@ -47,7 +47,9 @@ local PLACE_ID = game.PlaceId
 
 -- STATE
 local Config = {
-    IsDominant = false
+    IsDominant = false,
+    InitialGems = -1,
+    SessionGems = 0
 }
 
 -- LOAD CONFIG
@@ -56,13 +58,41 @@ local function LoadConfig()
         local success, decrypted = pcall(function()
             return HttpService:JSONDecode(readfile(CONFIG_FILE))
         end)
-        if success then Config = decrypted end
+        if success and typeof(decrypted) == "table" then 
+            Config.IsDominant = decrypted.IsDominant or false
+            Config.InitialGems = decrypted.InitialGems or -1
+            Config.SessionGems = decrypted.SessionGems or 0
+        end
     end
 end
 
 -- SAVE CONFIG
 local function SaveConfig()
     writefile(CONFIG_FILE, HttpService:JSONEncode(Config))
+end
+
+-- GEM TRACKER UTIL
+local function GetCurrentGems()
+    local path = LocalPlayer:FindFirstChild("PlayerGui")
+    if not path then return nil end
+    local val = path:FindFirstChild("GameUI")
+            and path.GameUI:FindFirstChild("Menu")
+            and path.GameUI.Menu:FindFirstChild("InventoryUI")
+            and path.GameUI.Menu.InventoryUI:FindFirstChild("ShopScreen")
+            and path.GameUI.Menu.InventoryUI.ShopScreen:FindFirstChild("Static")
+            and path.GameUI.Menu.InventoryUI.ShopScreen.Static:FindFirstChild("strip")
+            and path.GameUI.Menu.InventoryUI.ShopScreen.Static.strip:FindFirstChild("gemHolder")
+            and path.GameUI.Menu.InventoryUI.ShopScreen.Static.strip.gemHolder:FindFirstChild("GemValue")
+            
+    if val then
+        if val:IsA("IntValue") or val:IsA("NumberValue") then
+            return val.Value
+        elseif val:IsA("TextLabel") or val:IsA("TextBox") then
+            local rawStr = string.gsub(val.Text, "[^%d]", "")
+            return tonumber(rawStr)
+        end
+    end
+    return nil
 end
 
 -- PRESENCE REGISTRY
@@ -177,7 +207,18 @@ local function CreateGUI()
         SaveConfig()
     end)
 
-    return StatusLabel, StartBtn
+    local GemLabel = Instance.new("TextLabel")
+    GemLabel.Name = "GemLabel"
+    GemLabel.Parent = MainFrame
+    GemLabel.BackgroundTransparency = 1
+    GemLabel.Position = UDim2.new(0, 0, 1.25, 0)
+    GemLabel.Size = UDim2.new(1, 0, 0.2, 0)
+    GemLabel.Font = Enum.Font.GothamBold
+    GemLabel.Text = "💎 Farmed: " .. tostring(Config.SessionGems)
+    GemLabel.TextColor3 = Color3.fromRGB(0, 255, 255)
+    GemLabel.TextSize = 12
+
+    return StatusLabel, StartBtn, GemLabel
 end
 
 
@@ -281,12 +322,42 @@ local function AutoInjectNextServer()
 end
 
 -- LOGIC
-local function Main(StatusLabel)
+local function Main(StatusLabel, GemLabel)
     -- Start heartbeat
     task.spawn(function()
         while true do
             UpdateClientPresence()
             task.wait(3)
+        end
+    end)
+    
+    -- Gem Tracker Component
+    task.spawn(function()
+        while true do
+            local current = GetCurrentGems()
+            if current ~= nil then
+                if Config.InitialGems == -1 then
+                    Config.InitialGems = current
+                    SaveConfig()
+                end
+                
+                local earned = current - Config.InitialGems
+                if earned < 0 then
+                    -- They likely spent gems, reset baseline
+                    Config.InitialGems = current
+                    earned = 0
+                    SaveConfig()
+                end
+                
+                Config.SessionGems = earned
+                
+                local newText = "💎 Farmed: " .. tostring(earned) .. " | Total: " .. tostring(current)
+                if GemLabel.Text ~= newText then
+                    GemLabel.Text = newText
+                    SaveConfig()
+                end
+            end
+            task.wait(2)
         end
     end)
 
@@ -544,11 +615,16 @@ end
 
 -- Initialization
 LoadConfig()
-local StatusLabel, StartBtn = CreateGUI()
+local StatusLabel, StartBtn, GemLabel = CreateGUI()
 
 StartBtn.MouseButton1Click:Connect(function()
     StartBtn.Visible = false
-    Main(StatusLabel)
+    -- Manual start rests the gem farming session
+    Config.InitialGems = -1
+    Config.SessionGems = 0
+    SaveConfig()
+    
+    Main(StatusLabel, GemLabel)
 end)
 
 -- Auto Start check (If we have a valid recent sync file, we assume we just hopped, start automatically)
@@ -557,6 +633,7 @@ if isfile(SYNC_FILE) then
     -- If file was updated within 3 mins, assume we hopped and auto-start logic
     if success and data.Time and (tick() - data.Time < 180) then
         StartBtn.Visible = false
-        Main(StatusLabel)
+        -- Auto-start DOES NOT reset InitialGems, keeping the session running across hops
+        Main(StatusLabel, GemLabel)
     end
 end
