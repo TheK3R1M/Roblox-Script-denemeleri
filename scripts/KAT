@@ -185,59 +185,60 @@ local function CreateGUI()
     Title.Name = "Title"
     Title.Parent = MainFrame
     Title.BackgroundTransparency = 1
-    Title.Size = UDim2.new(1, 0, 0.3, 0)
+    Title.Size = UDim2.new(1, 0, 0, 35) -- Fixed height
     Title.Font = Enum.Font.GothamBold
     Title.Text = "KAT SYNC"
     Title.TextColor3 = Color3.fromRGB(255, 255, 255)
     Title.TextSize = 20
 
+    -- Container for vertical stacking
+    local ContentFrame = Instance.new("Frame")
+    ContentFrame.Name = "ContentFrame"
+    ContentFrame.Parent = MainFrame
+    ContentFrame.BackgroundTransparency = 1
+    ContentFrame.Position = UDim2.new(0, 0, 0, 40) -- Start below Title
+    ContentFrame.Size = UDim2.new(1, 0, 1, -40)
+
+    local MainLayout = Instance.new("UIListLayout")
+    MainLayout.Parent = ContentFrame
+    MainLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    MainLayout.Padding = UDim.new(0, 8)
+    MainLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+    local Padding = Instance.new("UIPadding")
+    Padding.Parent = ContentFrame
+    Padding.PaddingTop = UDim.new(0, 5)
+    Padding.PaddingBottom = UDim.new(0, 5)
+
     ToggleBtn.Name = "ToggleBtn"
-    ToggleBtn.Parent = MainFrame
+    ToggleBtn.Parent = ContentFrame
     ToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    ToggleBtn.Position = UDim2.new(0.1, 0, 0.4, 0)
-    ToggleBtn.Size = UDim2.new(0.8, 0, 0.3, 0)
+    ToggleBtn.Size = UDim2.new(0.9, 0, 0, 35)
     ToggleBtn.Font = Enum.Font.Gotham
     ToggleBtn.Text = Config.IsDominant and "ROLE: DOMINANT" or "ROLE: NON-DOMINANT"
     ToggleBtn.TextColor3 = Config.IsDominant and Color3.fromRGB(0, 255, 127) or Color3.fromRGB(255, 69, 0)
     ToggleBtn.TextSize = 14
+    ToggleBtn.LayoutOrder = 1
     local btnCorner = Instance.new("UICorner", ToggleBtn)
 
     local StartBtn = Instance.new("TextButton")
     StartBtn.Name = "StartBtn"
-    StartBtn.Parent = MainFrame
+    StartBtn.Parent = ContentFrame
     StartBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
-    StartBtn.Position = UDim2.new(0.1, 0, 0.75, 0)
-    StartBtn.Size = UDim2.new(0.8, 0, 0.2, 0)
+    StartBtn.Size = UDim2.new(0.9, 0, 0, 35)
     StartBtn.Font = Enum.Font.GothamBold
     StartBtn.Text = "START SYNC"
     StartBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     StartBtn.TextSize = 14
+    StartBtn.LayoutOrder = 2
     local startCorner = Instance.new("UICorner", StartBtn)
-
-    local DestroyBtn = Instance.new("TextButton")
-    DestroyBtn.Name = "DestroyBtn"
-    DestroyBtn.Parent = MainFrame
-    DestroyBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
-    DestroyBtn.Position = UDim2.new(0.85, 0, 0, 0)
-    DestroyBtn.Size = UDim2.new(0.15, 0, 0.25, 0)
-    DestroyBtn.Font = Enum.Font.GothamBold
-    DestroyBtn.Text = "X"
-    DestroyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    DestroyBtn.TextSize = 14
-    local destCorner = Instance.new("UICorner", DestroyBtn)
-
-    DestroyBtn.MouseButton1Click:Connect(function()
-        if getgenv().KAT_SYNC_DISCONNECT_V2 then
-            pcall(function() getgenv().KAT_SYNC_DISCONNECT_V2() end)
-        end
-    end)
 
     local StatsFrame = Instance.new("Frame")
     StatsFrame.Name = "StatsFrame"
-    StatsFrame.Parent = MainFrame
+    StatsFrame.Parent = ContentFrame
     StatsFrame.BackgroundTransparency = 1
-    StatsFrame.Position = UDim2.new(0.05, 0, 0.65, 0)
-    StatsFrame.Size = UDim2.new(0.9, 0, 0.3, 0)
+    StatsFrame.Size = UDim2.new(0.9, 0, 0, 50)
+    StatsFrame.LayoutOrder = 3
 
     local UIListLayout = Instance.new("UIListLayout")
     UIListLayout.Parent = StatsFrame
@@ -248,7 +249,7 @@ local function CreateGUI()
     StatusLabel.Name = "StatusLabel"
     StatusLabel.Parent = StatsFrame
     StatusLabel.BackgroundTransparency = 1
-    StatusLabel.Size = UDim2.new(1, 0, 0.4, 0)
+    StatusLabel.Size = UDim2.new(1, 0, 0, 15)
     StatusLabel.Font = Enum.Font.Gotham
     StatusLabel.Text = "Waiting to Start..."
     StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -259,7 +260,7 @@ local function CreateGUI()
     GemLabel.Name = "GemLabel"
     GemLabel.Parent = StatsFrame
     GemLabel.BackgroundTransparency = 1
-    GemLabel.Size = UDim2.new(1, 0, 0.4, 0)
+    GemLabel.Size = UDim2.new(1, 0, 0, 15)
     GemLabel.Font = Enum.Font.GothamBold
     GemLabel.Text = "💎 Farmed: " .. tostring(Config.SessionGems)
     GemLabel.TextColor3 = Color3.fromRGB(0, 255, 255)
