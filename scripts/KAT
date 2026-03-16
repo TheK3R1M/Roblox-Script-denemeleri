@@ -36,12 +36,6 @@ while not Players.LocalPlayer do
 end
 local LocalPlayer = Players.LocalPlayer
 
--- GAME ID PROTECTION
-if tostring(game.PlaceId) ~= "111163066268338" and tostring(game.GameId) ~= "111163066268338" and tostring(game.PlaceId) ~= "622129532" then
-    warn("KAT SYNC: Wrong Game! Protection triggered.")
-    return
-end
-
 local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
 local RunService = game:GetService("RunService")
@@ -126,7 +120,7 @@ local function UpdateClientPresence()
         end
         clients[LocalPlayer.Name] = {
             Role = Config.IsDominant and "Dominant" or "NonDominant",
-            LastSeen = os.time()
+            LastSeen = tick()
         }
         pcall(function() writefile(CLIENTS_FILE, HttpService:JSONEncode(clients)) end)
     end)
@@ -142,7 +136,7 @@ local function GetActiveNonDominants()
     end
     local count = 0
     for name, data in pairs(clients) do
-        if data.Role == "NonDominant" and (os.time() - data.LastSeen < 15) then
+        if data.Role == "NonDominant" and (tick() - data.LastSeen < 15) then
             count = count + 1
         end
     end
@@ -202,6 +196,7 @@ local function CreateGUI()
     local btnCorner = Instance.new("UICorner", ToggleBtn)
 
     local StartBtn = Instance.new("TextButton")
+    
     StartBtn.Name = "StartBtn"
     StartBtn.Parent = MainFrame
     StartBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
@@ -212,24 +207,6 @@ local function CreateGUI()
     StartBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     StartBtn.TextSize = 14
     local startCorner = Instance.new("UICorner", StartBtn)
-
-    local DestroyBtn = Instance.new("TextButton")
-    DestroyBtn.Name = "DestroyBtn"
-    DestroyBtn.Parent = MainFrame
-    DestroyBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
-    DestroyBtn.Position = UDim2.new(0.85, 0, 0, 0)
-    DestroyBtn.Size = UDim2.new(0.15, 0, 0.25, 0)
-    DestroyBtn.Font = Enum.Font.GothamBold
-    DestroyBtn.Text = "X"
-    DestroyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    DestroyBtn.TextSize = 14
-    local destCorner = Instance.new("UICorner", DestroyBtn)
-
-    DestroyBtn.MouseButton1Click:Connect(function()
-        if getgenv().KAT_SYNC_DISCONNECT_V2 then
-            pcall(function() getgenv().KAT_SYNC_DISCONNECT_V2() end)
-        end
-    end)
 
     local StatsFrame = Instance.new("Frame")
     StatsFrame.Name = "StatsFrame"
@@ -320,7 +297,7 @@ local function GetNextServer()
     end
     
     if #validServers > 0 then
-        math.randomseed(os.time())
+        math.randomseed(tick())
         local chosen = validServers[math.random(1, #validServers)]
         return chosen
     end
@@ -402,39 +379,36 @@ local function StartAppThreads(StatusLabel, GemLabel)
     
     -- Start heartbeat
     task.spawn(function()
-        while not scriptState.Destroyed do
-            if not scriptState.Stopped then
-                UpdateClientPresence()
-            end
+        while true do
+            UpdateClientPresence()
             task.wait(3)
         end
     end)
     
     -- Gem Tracker Component
     task.spawn(function()
-        while not scriptState.Destroyed do
-            if not scriptState.Stopped then
-                local current = GetCurrentGems()
-                if current ~= nil then
-                    if Config.InitialGems == -1 then
-                        Config.InitialGems = current
-                        SaveConfig()
-                    end
-                    
-                    local earned = current - Config.InitialGems
-                    if earned < 0 then
-                        Config.InitialGems = current
-                        earned = 0
-                        SaveConfig()
-                    end
-                    
-                    Config.SessionGems = earned
-                    
-                    local newText = "💎 Farmed: " .. tostring(earned) .. " | Total: " .. tostring(current)
-                    if GemLabel.Text ~= newText then
-                        GemLabel.Text = newText
-                        SaveConfig()
-                    end
+        while true do
+            local current = GetCurrentGems()
+            if current ~= nil then
+                if Config.InitialGems == -1 then
+                    Config.InitialGems = current
+                    SaveConfig()
+                end
+                
+                local earned = current - Config.InitialGems
+                if earned < 0 then
+                    -- They likely spent gems, reset baseline
+                    Config.InitialGems = current
+                    earned = 0
+                    SaveConfig()
+                end
+                
+                Config.SessionGems = earned
+                
+                local newText = "💎 Farmed: " .. tostring(earned) .. " | Total: " .. tostring(current)
+                if GemLabel.Text ~= newText then
+                    GemLabel.Text = newText
+                    SaveConfig()
                 end
             end
             task.wait(2)
@@ -449,7 +423,7 @@ local function Main(StatusLabel, GemLabel)
     StatusLabel.Text = "Waiting for Spawn..."
     
     -- Wait for spawn
-    while not scriptState.Stopped do
+    while true do
         local character = LocalPlayer.Character
         if character and character:FindFirstChild("HumanoidRootPart") then
             local spawnedVal = workspace:FindFirstChild(LocalPlayer.Name) and workspace[LocalPlayer.Name]:FindFirstChild("HasSpawned")
@@ -459,7 +433,6 @@ local function Main(StatusLabel, GemLabel)
         end
         task.wait(0.5)
     end
-    if scriptState.Stopped then return end
 
     StatusLabel.Text = "Teleporting..."
     CreatePlatform()
@@ -483,7 +456,7 @@ local function Main(StatusLabel, GemLabel)
         StatusLabel.Text = "Waiting for Targets..."
         -- Wait for all active Non-Dominant accounts to arrive
         local targets = {}
-        while not scriptState.Stopped do
+        while true do
             local expectedCount = GetActiveNonDominants()
             if expectedCount == 0 then expectedCount = 1 end
             
@@ -501,7 +474,6 @@ local function Main(StatusLabel, GemLabel)
             StatusLabel.Text = "Waiting for Targets ("..#targets.."/"..expectedCount..")..."
             task.wait(0.5)
         end
-        if scriptState.Stopped then return end
 
         local backpack = LocalPlayer:FindFirstChild("Backpack")
         local function EnsureKnifeEquipped()
@@ -542,7 +514,7 @@ local function Main(StatusLabel, GemLabel)
 
             StatusLabel.Text = "Waiting for ForceField ("..i.."/"..#targets..")"
             -- Wait until Spawn Invincibility (ForceField) is gone from both players
-            while not scriptState.Stopped do
+            while true do
                 if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("Humanoid") or LocalPlayer.Character.Humanoid.Health <= 0 then break end
                 local myFF = character:FindFirstChildOfClass("ForceField")
                 local targetFF = targetPlayer.Character:FindFirstChildOfClass("ForceField")
@@ -554,7 +526,6 @@ local function Main(StatusLabel, GemLabel)
                 end
                 task.wait(0.5)
             end
-            if scriptState.Stopped then return end
             
             if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("Humanoid") or LocalPlayer.Character.Humanoid.Health <= 0 then
                 StatusLabel.Text = "Died! Restarting..."
@@ -567,7 +538,7 @@ local function Main(StatusLabel, GemLabel)
             local maxAttempts = 30 -- Increase max attempts to be safe
             local attempts = 0
             
-            while not scriptState.Stopped and targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("Humanoid") and targetPlayer.Character.Humanoid.Health > 0 and attempts < maxAttempts do
+            while targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("Humanoid") and targetPlayer.Character.Humanoid.Health > 0 and attempts < maxAttempts do
                 
                 -- Aggressive Knife Equip Loop to guarantee it doesn't unequip
                 EnsureKnifeEquipped()
@@ -582,7 +553,6 @@ local function Main(StatusLabel, GemLabel)
                 task.wait(0.5)
                 attempts = attempts + 1
             end
-            if scriptState.Stopped then return end
             
             if attempts >= maxAttempts then
                 StatusLabel.Text = "Kill Timeout ("..i..")!"
@@ -593,7 +563,7 @@ local function Main(StatusLabel, GemLabel)
                 StatusLabel.Text = "Verifying KillFeed ("..i..")..."
                 local feedVerified = false
                 local killDelayAttempts = 0
-                while killDelayAttempts < 50 and not scriptState.Stopped do
+                while killDelayAttempts < 50 do -- Wait up to 5 seconds for the feed to show
                     pcall(function()
                         local killFeed = LocalPlayer.PlayerGui:FindFirstChild("GameUI")
                             and LocalPlayer.PlayerGui.GameUI:FindFirstChild("HUD")
@@ -626,14 +596,12 @@ local function Main(StatusLabel, GemLabel)
         end
         
         StatusLabel.Text = "All Kills Processed!"
-        task.wait(1)
-        if scriptState.Stopped then return end
+        task.wait(1) 
         
         -- PRE-HOP DEATH CHECK
         if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("Humanoid") or LocalPlayer.Character.Humanoid.Health <= 0 then
             StatusLabel.Text = "Died before hop! Retrying..."
             task.wait(2)
-            if scriptState.Stopped then return end
             return Main(StatusLabel, GemLabel)
         end
         
@@ -644,7 +612,7 @@ local function Main(StatusLabel, GemLabel)
             if nextJobId then
                 -- Only write the file if we are picking a new server, not retrying an existing one
                 if not forcedJobId then
-                    writefile(SYNC_FILE, HttpService:JSONEncode({JobId = nextJobId, Time = os.time()}))
+                    writefile(SYNC_FILE, HttpService:JSONEncode({JobId = nextJobId, Time = tick()}))
                 end
                 StatusLabel.Text = "Hopping..."
                 AutoInjectNextServer()
@@ -696,12 +664,11 @@ local function Main(StatusLabel, GemLabel)
     else
         StatusLabel.Text = "Waiting for Sync..."
         -- Poll for server change
-        while not scriptState.Stopped do
+        while true do
             -- SAFEGUARD: If Non-Dominant dies while waiting, restart to teleport back underground
             if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("Humanoid") or LocalPlayer.Character.Humanoid.Health <= 0 then
                 StatusLabel.Text = "Died while waiting! Restarting..."
                 task.wait(2)
-                if scriptState.Stopped then return end
                 return Main(StatusLabel, GemLabel)
             end
             
@@ -710,7 +677,7 @@ local function Main(StatusLabel, GemLabel)
                     return HttpService:JSONDecode(readfile(SYNC_FILE))
                 end)
                 -- If the file was written reasonably recently (10 mins) and is a different server
-                if success and data.JobId and (os.time() - data.Time < 600) and data.JobId ~= game.JobId then
+                if success and data.JobId and (tick() - data.Time < 600) and data.JobId ~= game.JobId then
                     StatusLabel.Text = "Following to Server..."
                     AutoInjectNextServer()
                     
@@ -751,35 +718,22 @@ LoadConfig()
 local StatusLabel, StartBtn, GemLabel = CreateGUI()
 
 StartBtn.MouseButton1Click:Connect(function()
-    if scriptState.Stopped then
-        scriptState.Stopped = false
-        StartBtn.Text = "STOP SYNC"
-        StartBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
-        
-        -- Manual start rests the gem farming session
-        Config.InitialGems = -1
-        Config.SessionGems = 0
-        SaveConfig()
-        
-        task.spawn(function() Main(StatusLabel, GemLabel) end)
-    else
-        scriptState.Stopped = true
-        StartBtn.Text = "START SYNC"
-        StartBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
-        StatusLabel.Text = "Stopped."
-    end
+    StartBtn.Visible = false
+    -- Manual start rests the gem farming session
+    Config.InitialGems = -1
+    Config.SessionGems = 0
+    SaveConfig()
+    
+    Main(StatusLabel, GemLabel)
 end)
 
 -- Auto Start check (If we have a valid recent sync file, we assume we just hopped, start automatically)
 if isfile(SYNC_FILE) then
     local success, data = pcall(function() return HttpService:JSONDecode(readfile(SYNC_FILE)) end)
-    -- If file was updated within 10 mins, OR we landed in the exact same JobId
-    if success and data.Time and ((os.time() - data.Time < 600) or tostring(game.JobId) == tostring(data.JobId)) then
-        scriptState.Stopped = false
-        StartBtn.Text = "STOP SYNC"
-        StartBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
-        
+    -- If file was updated within 3 mins, assume we hopped and auto-start logic
+    if success and data.Time and (tick() - data.Time < 180) then
+        StartBtn.Visible = false
         -- Auto-start DOES NOT reset InitialGems, keeping the session running across hops
-        task.spawn(function() Main(StatusLabel, GemLabel) end)
+        Main(StatusLabel, GemLabel)
     end
 end
