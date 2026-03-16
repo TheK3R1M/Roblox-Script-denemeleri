@@ -172,8 +172,8 @@ local function CreateGUI()
     MainFrame.Name = "MainFrame"
     MainFrame.Parent = ScreenGui
     MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-    MainFrame.Position = UDim2.new(0, 20, 0.4, 0) -- Left-center
-    MainFrame.Size = UDim2.new(0, 200, 0, 200)
+    MainFrame.Position = UDim2.new(0.2, -100, 0.2, -75)
+    MainFrame.Size = UDim2.new(0, 200, 0, 150)
     MainFrame.Active = true
     MainFrame.Draggable = true
 
@@ -185,86 +185,85 @@ local function CreateGUI()
     Title.Name = "Title"
     Title.Parent = MainFrame
     Title.BackgroundTransparency = 1
-    Title.Size = UDim2.new(1, 0, 0, 35) -- Fixed height
+    Title.Size = UDim2.new(1, 0, 0.3, 0)
     Title.Font = Enum.Font.GothamBold
     Title.Text = "KAT SYNC"
     Title.TextColor3 = Color3.fromRGB(255, 255, 255)
     Title.TextSize = 20
 
-    -- Container for vertical stacking
-    local ContentFrame = Instance.new("Frame")
-    ContentFrame.Name = "ContentFrame"
-    ContentFrame.Parent = MainFrame
-    ContentFrame.BackgroundTransparency = 1
-    ContentFrame.Position = UDim2.new(0, 0, 0, 40) -- Start below Title
-    ContentFrame.Size = UDim2.new(1, 0, 1, -40)
-
-    local MainLayout = Instance.new("UIListLayout")
-    MainLayout.Parent = ContentFrame
-    MainLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    MainLayout.Padding = UDim.new(0, 8)
-    MainLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-
-    local Padding = Instance.new("UIPadding")
-    Padding.Parent = ContentFrame
-    Padding.PaddingTop = UDim.new(0, 5)
-    Padding.PaddingBottom = UDim.new(0, 5)
-
     ToggleBtn.Name = "ToggleBtn"
-    ToggleBtn.Parent = ContentFrame
+    ToggleBtn.Parent = MainFrame
     ToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    ToggleBtn.Size = UDim2.new(0.9, 0, 0, 35)
+    ToggleBtn.Position = UDim2.new(0.1, 0, 0.4, 0)
+    ToggleBtn.Size = UDim2.new(0.8, 0, 0.3, 0)
     ToggleBtn.Font = Enum.Font.Gotham
     ToggleBtn.Text = Config.IsDominant and "ROLE: DOMINANT" or "ROLE: NON-DOMINANT"
     ToggleBtn.TextColor3 = Config.IsDominant and Color3.fromRGB(0, 255, 127) or Color3.fromRGB(255, 69, 0)
     ToggleBtn.TextSize = 14
-    ToggleBtn.LayoutOrder = 1
     local btnCorner = Instance.new("UICorner", ToggleBtn)
 
     local StartBtn = Instance.new("TextButton")
     StartBtn.Name = "StartBtn"
-    StartBtn.Parent = ContentFrame
+    StartBtn.Parent = MainFrame
     StartBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
-    StartBtn.Size = UDim2.new(0.9, 0, 0, 35)
+    StartBtn.Position = UDim2.new(0.1, 0, 0.75, 0)
+    StartBtn.Size = UDim2.new(0.8, 0, 0.2, 0)
     StartBtn.Font = Enum.Font.GothamBold
     StartBtn.Text = "START SYNC"
     StartBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     StartBtn.TextSize = 14
-    StartBtn.LayoutOrder = 2
     local startCorner = Instance.new("UICorner", StartBtn)
+
+    local DestroyBtn = Instance.new("TextButton")
+    DestroyBtn.Name = "DestroyBtn"
+    DestroyBtn.Parent = MainFrame
+    DestroyBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+    DestroyBtn.Position = UDim2.new(0.85, 0, 0, 0)
+    DestroyBtn.Size = UDim2.new(0.15, 0, 0.25, 0)
+    DestroyBtn.Font = Enum.Font.GothamBold
+    DestroyBtn.Text = "X"
+    DestroyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    DestroyBtn.TextSize = 14
+    local destCorner = Instance.new("UICorner", DestroyBtn)
+
+    DestroyBtn.MouseButton1Click:Connect(function()
+        if getgenv().KAT_SYNC_DISCONNECT_V2 then
+            pcall(function() getgenv().KAT_SYNC_DISCONNECT_V2() end)
+        end
+    end)
 
     local StatsFrame = Instance.new("Frame")
     StatsFrame.Name = "StatsFrame"
-    StatsFrame.Parent = ContentFrame
+    StatsFrame.Parent = MainFrame
     StatsFrame.BackgroundTransparency = 1
-    StatsFrame.Size = UDim2.new(0.9, 0, 0, 50)
-    StatsFrame.LayoutOrder = 3
+    StatsFrame.Position = UDim2.new(0, 0, 1, 5)
+    StatsFrame.Size = UDim2.new(1, 0, 0.4, 0)
 
     local UIListLayout = Instance.new("UIListLayout")
     UIListLayout.Parent = StatsFrame
     UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    UIListLayout.Padding = UDim.new(0, 2)
+    UIListLayout.Padding = UDim.new(0, 5)
     UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
     StatusLabel.Name = "StatusLabel"
     StatusLabel.Parent = StatsFrame
     StatusLabel.BackgroundTransparency = 1
-    StatusLabel.Size = UDim2.new(1, 0, 0, 15)
+    StatusLabel.Size = UDim2.new(1, 0, 0.5, 0)
     StatusLabel.Font = Enum.Font.Gotham
     StatusLabel.Text = "Waiting to Start..."
     StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-    StatusLabel.TextSize = 11
+    StatusLabel.TextSize = 12
     StatusLabel.LayoutOrder = 1
 
     local GemLabel = Instance.new("TextLabel")
     GemLabel.Name = "GemLabel"
     GemLabel.Parent = StatsFrame
     GemLabel.BackgroundTransparency = 1
-    GemLabel.Size = UDim2.new(1, 0, 0, 15)
+    GemLabel.Size = UDim2.new(1, 0, 0.5, 0)
     GemLabel.Font = Enum.Font.GothamBold
     GemLabel.Text = "💎 Farmed: " .. tostring(Config.SessionGems)
     GemLabel.TextColor3 = Color3.fromRGB(0, 255, 255)
-    GemLabel.TextSize = 12
+    GemLabel.TextSize = 13
     GemLabel.LayoutOrder = 2
 
     ToggleBtn.MouseButton1Click:Connect(function()
@@ -340,60 +339,52 @@ local function AutoInjectNextServer()
     local queueFunction = syn and syn.queue_on_teleport or queue_on_teleport or (fluxus and fluxus.queue_on_teleport)
     if queueFunction then
         
-        local payload = [[
-            repeat task.wait() until game:IsLoaded()
-            task.wait(2)
-            
-            local SCRIPT_URL = "]] .. SCRIPT_URL .. [["
-            local CACHE_FILE = "KAT_Sync_Cache.lua"
-            local code = ""
-            local success = false
-            
-            -- Attempt to fetch from GitHub (10 retries)
-            if SCRIPT_URL ~= "" then
-                for i = 1, 10 do
-                    local s, res = pcall(function() return game:HttpGet(SCRIPT_URL) end)
-                    if s and res and #res > 100 then
-                        code = res
-                        success = true
-                        -- Save to local cache for future offline use
-                        pcall(function() writefile(CACHE_FILE, res) end)
-                        break
+        local payload = ""
+        if SCRIPT_URL and SCRIPT_URL ~= "" then
+            payload = [[
+                local s, code = pcall(function() return game:HttpGet("]] .. SCRIPT_URL .. [[") end)
+                if s and code and code ~= "" then
+                    loadstring(code)()
+                else
+                    warn("KAT SYNC ERROR: GitHub/Pastebin rate limit hit or timeout. Falling back to local files.")
+                    task.wait(3)
+                    local loaded = false
+                    local possibleNames = {"KAT_Sync_Script.lua", "KAT.lua", "sync.lua", "kat_sync.lua", "autoexec.lua"}
+                    for _, name in ipairs(possibleNames) do
+                        if isfile(name) then
+                            local src = readfile(name)
+                            if src:find("KAT CO%-OP SYNC SCRIPT") then
+                                pcall(function() loadstring(src)() end)
+                                loaded = true
+                                break
+                            end
+                        end
                     end
-                    task.wait(2)
                 end
-            end
-            
-            -- Fallback to local cache if GitHub failed
-            if not success and isfile(CACHE_FILE) then
-                local res = readfile(CACHE_FILE)
-                if #res > 100 then
-                    code = res
-                    success = true
-                end
-            end
-            
-            -- Ultimate fallback: Search common filenames
-            if not success then
+            ]]
+        else
+            payload = [[
+                task.wait(3)
+                
+                local loaded = false
                 local possibleNames = {"KAT_Sync_Script.lua", "KAT.lua", "sync.lua", "kat_sync.lua", "autoexec.lua"}
+                
                 for _, name in ipairs(possibleNames) do
                     if isfile(name) then
                         local src = readfile(name)
                         if src:find("KAT CO%-OP SYNC SCRIPT") then
-                            code = src
-                            success = true
-                            break
+                            local s, err = pcall(function() loadstring(src)() end)
+                            if s then loaded = true break end
                         end
                     end
                 end
-            end
-            
-            if success and code ~= "" then
-                loadstring(code)()
-            else
-                warn("KAT SYNC ERROR: Could not load script after multiple attempts!")
-            end
-        ]]
+                
+                if not loaded then
+                    warn("KAT SYNC ERROR: I couldn't find my own file to auto-execute!")
+                    warn("SOLUTION: You must put a link in SCRIPT_URL.")
+                end
+            ]]
+        end
         
         -- Strategy 1: Queue immediately (Works best for generic/budget executors)
         pcall(function() queueFunction(payload) end)
@@ -424,29 +415,28 @@ local function StartAppThreads(StatusLabel, GemLabel)
     task.spawn(function()
         while not scriptState.Destroyed do
             if not scriptState.Stopped then
-                    local current = GetCurrentGems()
-                    if current ~= nil then
-                        if Config.InitialGems == -1 then
-                            Config.InitialGems = current
-                            SaveConfig()
-                        end
-                        
-                        -- Logic: If we reset, earned starts at 0. Across hops, SessionGems accumulates.
-                        local diff = current - Config.InitialGems
-                        if diff < 0 then
-                            -- Gems spent or UI reset
-                            Config.InitialGems = current
-                            diff = 0
-                        end
-                        
-                        Config.SessionGems = diff
-                        
-                        local newText = "💎 Session: " .. tostring(Config.SessionGems) .. " | Total: " .. tostring(current)
-                        if GemLabel.Text ~= newText then
-                            GemLabel.Text = newText
-                            SaveConfig()
-                        end
+                local current = GetCurrentGems()
+                if current ~= nil then
+                    if Config.InitialGems == -1 then
+                        Config.InitialGems = current
+                        SaveConfig()
                     end
+                    
+                    local earned = current - Config.InitialGems
+                    if earned < 0 then
+                        Config.InitialGems = current
+                        earned = 0
+                        SaveConfig()
+                    end
+                    
+                    Config.SessionGems = earned
+                    
+                    local newText = "💎 Farmed: " .. tostring(earned) .. " | Total: " .. tostring(current)
+                    if GemLabel.Text ~= newText then
+                        GemLabel.Text = newText
+                        SaveConfig()
+                    end
+                end
             end
             task.wait(2)
         end
@@ -769,9 +759,6 @@ local function Main(StatusLabel, GemLabel)
 end
 
 -- Initialization
-repeat task.wait(1) until game:IsLoaded()
-task.wait(2) -- Extra buffer for file system stability
-
 LoadConfig()
 local StatusLabel, StartBtn, GemLabel = CreateGUI()
 
@@ -797,17 +784,14 @@ end)
 
 -- Auto Start check (If we have a valid recent sync file, we assume we just hopped, start automatically)
 if isfile(SYNC_FILE) then
-    local success, content = pcall(function() return readfile(SYNC_FILE) end)
-    if success and content then
-        local decodeSuccess, data = pcall(function() return HttpService:JSONDecode(content) end)
-        -- If file was updated within 10 mins, OR we landed in the exact same JobId
-        if decodeSuccess and data and data.Time and ((os.time() - data.Time < 600) or tostring(game.JobId) == tostring(data.JobId)) then
-            scriptState.Stopped = false
-            StartBtn.Text = "STOP SYNC"
-            StartBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
-            
-            -- Auto-start DOES NOT reset InitialGems, keeping the session running across hops
-            task.spawn(function() Main(StatusLabel, GemLabel) end)
-        end
+    local success, data = pcall(function() return HttpService:JSONDecode(readfile(SYNC_FILE)) end)
+    -- If file was updated within 10 mins, OR we landed in the exact same JobId
+    if success and data.Time and ((os.time() - data.Time < 600) or tostring(game.JobId) == tostring(data.JobId)) then
+        scriptState.Stopped = false
+        StartBtn.Text = "STOP SYNC"
+        StartBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+        
+        -- Auto-start DOES NOT reset InitialGems, keeping the session running across hops
+        task.spawn(function() Main(StatusLabel, GemLabel) end)
     end
 end
