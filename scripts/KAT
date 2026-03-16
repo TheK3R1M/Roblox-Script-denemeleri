@@ -172,7 +172,7 @@ local function CreateGUI()
     MainFrame.Name = "MainFrame"
     MainFrame.Parent = ScreenGui
     MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-    MainFrame.Position = UDim2.new(0a, 20, 0, 50) -- Top-left, out of the way
+    MainFrame.Position = UDim2.new(0, 20, 0.4, 0) -- Left-center
     MainFrame.Size = UDim2.new(0, 200, 0, 200)
     MainFrame.Active = true
     MainFrame.Draggable = true
