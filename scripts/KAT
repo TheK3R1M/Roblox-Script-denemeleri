@@ -396,13 +396,46 @@ local function Main(StatusLabel)
             if attempts >= maxAttempts then
                 StatusLabel.Text = "Kill Timeout ("..i..")!"
             else
-                StatusLabel.Text = "Target Defeated ("..i..")!"
+                StatusLabel.Text = "Kill Registered ("..i..")!"
+                
+                -- Verify the kill on the KillFeed UI
+                StatusLabel.Text = "Verifying KillFeed ("..i..")..."
+                local feedVerified = false
+                local killDelayAttempts = 0
+                while killDelayAttempts < 50 do -- Wait up to 5 seconds for the feed to show
+                    pcall(function()
+                        local killFeed = LocalPlayer.PlayerGui:FindFirstChild("GameUI")
+                            and LocalPlayer.PlayerGui.GameUI:FindFirstChild("HUD")
+                            and LocalPlayer.PlayerGui.GameUI.HUD:FindFirstChild("KillFeed")
+                            
+                        if killFeed then
+                            for _, child in ipairs(killFeed:GetChildren()) do
+                                if child.Name == "KillFeedTemplate" and child:FindFirstChild("Contents") then
+                                    local killerLbl = child.Contents:FindFirstChild("Killer")
+                                    local targetLbl = child.Contents:FindFirstChild("Target")
+                                    if killerLbl and targetLbl and killerLbl.Text == LocalPlayer.Name and targetLbl.Text == targetPlayer.Name then
+                                        feedVerified = true
+                                    end
+                                end
+                            end
+                        end
+                    end)
+                    if feedVerified then break end
+                    killDelayAttempts = killDelayAttempts + 1
+                    task.wait(0.1)
+                end
+                
+                if feedVerified then
+                    StatusLabel.Text = "Target "..i.." Verified!"
+                else
+                    StatusLabel.Text = "Target "..i.." Unverified! (Timeout)"
+                end
             end
-            task.wait(1) -- Short delay after confirmed kill
+            task.wait(0.5) -- Short delay after confirmed kill
         end
         
-        StatusLabel.Text = "Kills processing..."
-        task.wait(4) -- Wait 4 seconds to ensure the server correctly counts all kills before bouncing
+        StatusLabel.Text = "All Kills Processed!"
+        task.wait(1) 
         
         -- Coordinated Server Hop
         local function AttemptHop()
