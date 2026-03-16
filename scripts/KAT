@@ -172,7 +172,7 @@ local function CreateGUI()
     MainFrame.Name = "MainFrame"
     MainFrame.Parent = ScreenGui
     MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-    MainFrame.Position = UDim2.new(0.5, -100, 0.5, -100)
+    MainFrame.Position = UDim2.new(0.5, 20, 0.2, 50) -- Top-left, out of the way
     MainFrame.Size = UDim2.new(0, 200, 0, 200)
     MainFrame.Active = true
     MainFrame.Draggable = true
@@ -769,6 +769,9 @@ local function Main(StatusLabel, GemLabel)
 end
 
 -- Initialization
+repeat task.wait(1) until game:IsLoaded()
+task.wait(2) -- Extra buffer for file system stability
+
 LoadConfig()
 local StatusLabel, StartBtn, GemLabel = CreateGUI()
 
@@ -794,14 +797,17 @@ end)
 
 -- Auto Start check (If we have a valid recent sync file, we assume we just hopped, start automatically)
 if isfile(SYNC_FILE) then
-    local success, data = pcall(function() return HttpService:JSONDecode(readfile(SYNC_FILE)) end)
-    -- If file was updated within 10 mins, OR we landed in the exact same JobId
-    if success and data.Time and ((os.time() - data.Time < 600) or tostring(game.JobId) == tostring(data.JobId)) then
-        scriptState.Stopped = false
-        StartBtn.Text = "STOP SYNC"
-        StartBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
-        
-        -- Auto-start DOES NOT reset InitialGems, keeping the session running across hops
-        task.spawn(function() Main(StatusLabel, GemLabel) end)
+    local success, content = pcall(function() return readfile(SYNC_FILE) end)
+    if success and content then
+        local decodeSuccess, data = pcall(function() return HttpService:JSONDecode(content) end)
+        -- If file was updated within 10 mins, OR we landed in the exact same JobId
+        if decodeSuccess and data and data.Time and ((os.time() - data.Time < 600) or tostring(game.JobId) == tostring(data.JobId)) then
+            scriptState.Stopped = false
+            StartBtn.Text = "STOP SYNC"
+            StartBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+            
+            -- Auto-start DOES NOT reset InitialGems, keeping the session running across hops
+            task.spawn(function() Main(StatusLabel, GemLabel) end)
+        end
     end
 end
