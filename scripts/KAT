@@ -401,6 +401,9 @@ local function Main(StatusLabel)
             task.wait(1) -- Short delay after confirmed kill
         end
         
+        StatusLabel.Text = "Kills processing..."
+        task.wait(4) -- Wait 4 seconds to ensure the server correctly counts all kills before bouncing
+        
         -- Coordinated Server Hop
         local function AttemptHop()
             StatusLabel.Text = "Choosing Server..."
