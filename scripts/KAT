@@ -209,12 +209,19 @@ local function GetNextServer()
         return nil 
     end
     
+    local validServers = {}
     for _, server in ipairs(data.data) do
-        -- Ensure server is very empty (less than 5 players), has at least 2 empty slots, and is not the current server
-        -- Allow 0 players if the server is valid, but usually we look for < 5
-        if server.playing and server.maxPlayers and server.playing < 5 and (server.maxPlayers - server.playing >= 2) and server.id ~= game.JobId then
-            return server.id
+        -- Skip 0-player servers (Ghost servers that often crash/error)
+        -- Ensure server has between 1 and 8 players to leave plenty of room for our group
+        if server.playing and server.maxPlayers and server.playing > 0 and server.playing < 8 and (server.maxPlayers - server.playing >= 3) and server.id ~= game.JobId then
+            table.insert(validServers, server.id)
         end
+    end
+    
+    if #validServers > 0 then
+        math.randomseed(tick())
+        local chosen = validServers[math.random(1, #validServers)]
+        return chosen
     end
     
     warn("KAT SYNC: No suitable server found in the list.")
