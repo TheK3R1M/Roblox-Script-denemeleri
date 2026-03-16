@@ -339,52 +339,60 @@ local function AutoInjectNextServer()
     local queueFunction = syn and syn.queue_on_teleport or queue_on_teleport or (fluxus and fluxus.queue_on_teleport)
     if queueFunction then
         
-        local payload = ""
-        if SCRIPT_URL and SCRIPT_URL ~= "" then
-            payload = [[
-                local s, code = pcall(function() return game:HttpGet("]] .. SCRIPT_URL .. [[") end)
-                if s and code and code ~= "" then
-                    loadstring(code)()
-                else
-                    warn("KAT SYNC ERROR: GitHub/Pastebin rate limit hit or timeout. Falling back to local files.")
-                    task.wait(3)
-                    local loaded = false
-                    local possibleNames = {"KAT_Sync_Script.lua", "KAT.lua", "sync.lua", "kat_sync.lua", "autoexec.lua"}
-                    for _, name in ipairs(possibleNames) do
-                        if isfile(name) then
-                            local src = readfile(name)
-                            if src:find("KAT CO%-OP SYNC SCRIPT") then
-                                pcall(function() loadstring(src)() end)
-                                loaded = true
-                                break
-                            end
-                        end
+        local payload = [[
+            repeat task.wait() until game:IsLoaded()
+            task.wait(2)
+            
+            local SCRIPT_URL = "]] .. SCRIPT_URL .. [["
+            local CACHE_FILE = "KAT_Sync_Cache.lua"
+            local code = ""
+            local success = false
+            
+            -- Attempt to fetch from GitHub (10 retries)
+            if SCRIPT_URL ~= "" then
+                for i = 1, 10 do
+                    local s, res = pcall(function() return game:HttpGet(SCRIPT_URL) end)
+                    if s and res and #res > 100 then
+                        code = res
+                        success = true
+                        -- Save to local cache for future offline use
+                        pcall(function() writefile(CACHE_FILE, res) end)
+                        break
                     end
+                    task.wait(2)
                 end
-            ]]
-        else
-            payload = [[
-                task.wait(3)
-                
-                local loaded = false
+            end
+            
+            -- Fallback to local cache if GitHub failed
+            if not success and isfile(CACHE_FILE) then
+                local res = readfile(CACHE_FILE)
+                if #res > 100 then
+                    code = res
+                    success = true
+                end
+            end
+            
+            -- Ultimate fallback: Search common filenames
+            if not success then
                 local possibleNames = {"KAT_Sync_Script.lua", "KAT.lua", "sync.lua", "kat_sync.lua", "autoexec.lua"}
-                
                 for _, name in ipairs(possibleNames) do
                     if isfile(name) then
                         local src = readfile(name)
                         if src:find("KAT CO%-OP SYNC SCRIPT") then
-                            local s, err = pcall(function() loadstring(src)() end)
-                            if s then loaded = true break end
+                            code = src
+                            success = true
+                            break
                         end
                     end
                 end
-                
-                if not loaded then
-                    warn("KAT SYNC ERROR: I couldn't find my own file to auto-execute!")
-                    warn("SOLUTION: You must put a link in SCRIPT_URL.")
-                end
-            ]]
-        end
+            end
+            
+            if success and code ~= "" then
+                loadstring(code)()
+            else
+                warn("KAT SYNC ERROR: Could not load script after multiple attempts!")
+            end
+        ]]
         
         -- Strategy 1: Queue immediately (Works best for generic/budget executors)
         pcall(function() queueFunction(payload) end)
