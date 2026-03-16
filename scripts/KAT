@@ -321,8 +321,11 @@ local function AutoInjectNextServer()
     end
 end
 
--- LOGIC
-local function Main(StatusLabel, GemLabel)
+local AppThreadsStarted = false
+local function StartAppThreads(StatusLabel, GemLabel)
+    if AppThreadsStarted then return end
+    AppThreadsStarted = true
+    
     -- Start heartbeat
     task.spawn(function()
         while true do
@@ -360,6 +363,11 @@ local function Main(StatusLabel, GemLabel)
             task.wait(2)
         end
     end)
+end
+
+-- LOGIC
+local function Main(StatusLabel, GemLabel)
+    StartAppThreads(StatusLabel, GemLabel)
 
     StatusLabel.Text = "Waiting for Spawn..."
     
@@ -435,10 +443,16 @@ local function Main(StatusLabel, GemLabel)
             if targetPlayer.Character.Humanoid.Health <= 0 then
                 continue 
             end
+            if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("Humanoid") or LocalPlayer.Character.Humanoid.Health <= 0 then
+                StatusLabel.Text = "Died during combat! Restarting..."
+                task.wait(2)
+                return Main(StatusLabel, GemLabel)
+            end
 
             StatusLabel.Text = "Waiting for ForceField ("..i.."/"..#targets..")"
             -- Wait until Spawn Invincibility (ForceField) is gone from both players
             while true do
+                if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("Humanoid") or LocalPlayer.Character.Humanoid.Health <= 0 then break end
                 local myFF = character:FindFirstChildOfClass("ForceField")
                 local targetFF = targetPlayer.Character:FindFirstChildOfClass("ForceField")
                 if not myFF and not targetFF then
@@ -448,6 +462,12 @@ local function Main(StatusLabel, GemLabel)
                     break
                 end
                 task.wait(0.5)
+            end
+            
+            if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("Humanoid") or LocalPlayer.Character.Humanoid.Health <= 0 then
+                StatusLabel.Text = "Died! Restarting..."
+                task.wait(2)
+                return Main(StatusLabel, GemLabel)
             end
 
             -- Loop click until target is dead
@@ -512,6 +532,13 @@ local function Main(StatusLabel, GemLabel)
         StatusLabel.Text = "All Kills Processed!"
         task.wait(1) 
         
+        -- PRE-HOP DEATH CHECK
+        if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("Humanoid") or LocalPlayer.Character.Humanoid.Health <= 0 then
+            StatusLabel.Text = "Died before hop! Retrying..."
+            task.wait(2)
+            return Main(StatusLabel, GemLabel)
+        end
+        
         -- Coordinated Server Hop
         local function AttemptHop(forcedJobId)
             StatusLabel.Text = "Choosing Server..."
@@ -572,6 +599,13 @@ local function Main(StatusLabel, GemLabel)
         StatusLabel.Text = "Waiting for Sync..."
         -- Poll for server change
         while true do
+            -- SAFEGUARD: If Non-Dominant dies while waiting, restart to teleport back underground
+            if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("Humanoid") or LocalPlayer.Character.Humanoid.Health <= 0 then
+                StatusLabel.Text = "Died while waiting! Restarting..."
+                task.wait(2)
+                return Main(StatusLabel, GemLabel)
+            end
+            
             if isfile(SYNC_FILE) then
                 local success, data = pcall(function()
                     return HttpService:JSONDecode(readfile(SYNC_FILE))
