@@ -56,7 +56,6 @@ GuiService.ErrorMessageChanged:Connect(function()
 end)
 
 -- CONFIGURATION
-local SessionStartTime = os.time()
 local SCRIPT_URL = "https://raw.githubusercontent.com/TheK3R1M/Roblox-Script-denemeleri/refs/heads/main/scripts/KAT" -- (OPTIONAL) PUT YOUR GITHUB/PASTEBIN RAW SCRIPT LINK HERE FOR 100% RELIABLE AUTO-EXECUTE BETWEEN SERVERS
 local TARGET_COORD = Vector3.new(0, -500, 0)
 local NON_DOMINANT_OFFSET = Vector3.new(0, 0, -3) -- 3 studs directly in front
@@ -506,30 +505,19 @@ local function Main(StatusLabel, GemLabel)
 
         local backpack = LocalPlayer:FindFirstChild("Backpack")
         local function EnsureKnifeEquipped()
-            -- Force re-evaluate humanoid and character in case of resets
-            local char = LocalPlayer.Character
-            local h = char and char:FindFirstChildOfClass("Humanoid")
+            -- Force re-evaluate humanoid and backpack in case of resets
+            local h = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
             if not h then return false end
             
-            -- If already holding a tool and it's parented to character, we are good
-            local currentTool = char:FindFirstChildOfClass("Tool")
-            if currentTool and currentTool.Parent == char then return true end
+            -- If already holding a tool (hopefully knife), we are good
+            local currentTool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
+            if currentTool then return true end
             
             local bp = LocalPlayer:FindFirstChild("Backpack")
             if h and bp then
-                -- Priority 1: Specifically named "Knife"
                 for _, item in ipairs(bp:GetChildren()) do
-                    if item:IsA("Tool") and item.Name:lower() == "knife" then
+                    if item.Name:lower():find("knife") or item:IsA("Tool") then
                         pcall(function() h:EquipTool(item) end)
-                        task.wait(0.2)
-                        return true
-                    end
-                end
-                -- Priority 2: Anything that looks like a tool/knife
-                for _, item in ipairs(bp:GetChildren()) do
-                    if item:IsA("Tool") or item.Name:lower():find("knife") then
-                        pcall(function() h:EquipTool(item) end)
-                        task.wait(0.2)
                         return true
                     end
                 end
@@ -721,8 +709,8 @@ local function Main(StatusLabel, GemLabel)
                 local success, data = pcall(function()
                     return HttpService:JSONDecode(readfile(SYNC_FILE))
                 end)
-                -- If the file was written after this script session started and is a different server
-                if success and data.JobId and data.Time and data.Time > (SessionStartTime - 10) and data.JobId ~= game.JobId then
+                -- If the file was written reasonably recently (10 mins) and is a different server
+                if success and data.JobId and (os.time() - data.Time < 600) and data.JobId ~= game.JobId then
                     StatusLabel.Text = "Following to Server..."
                     AutoInjectNextServer()
                     
