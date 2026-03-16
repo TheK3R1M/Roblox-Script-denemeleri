@@ -11,10 +11,10 @@
 
 local Players = game:GetService("Players")
 
--- Prevent double execution robustly across all executors
-if game.CoreGui:FindFirstChild("KAT_Sync_GUI") then
-    warn("KAT SYNC: Script is already running!")
-    return
+-- Clean up old instances (Prevents execution failure on executors that don't wipe CoreGui between hops)
+local existingGui = game.CoreGui:FindFirstChild("KAT_Sync_GUI")
+if existingGui then
+    existingGui:Destroy()
 end
 
 -- Wait for LocalPlayer to load if running in autoexec early injection
@@ -37,7 +37,7 @@ GuiService.ErrorMessageChanged:Connect(function()
 end)
 
 -- CONFIGURATION
-local SCRIPT_URL = "https://raw.githubusercontent.com/TheK3R1M/Roblox-Script-denemeleri/refs/heads/main/scripts/KAT?token=GHSAT0AAAAAADUJINNUNKPI6COHYVAVBB622NXMSJA" -- (OPTIONAL) PUT YOUR GITHUB/PASTEBIN RAW SCRIPT LINK HERE FOR 100% RELIABLE AUTO-EXECUTE BETWEEN SERVERS
+local SCRIPT_URL = "https://raw.githubusercontent.com/TheK3R1M/Roblox-Script-denemeleri/refs/heads/main/scripts/KAT?token=GHSAT0AAAAAADUJINNUQHOWVCW7FL6VNZXU2NXHTVA" -- (OPTIONAL) PUT YOUR GITHUB/PASTEBIN RAW SCRIPT LINK HERE FOR 100% RELIABLE AUTO-EXECUTE BETWEEN SERVERS
 local TARGET_COORD = Vector3.new(0, -500, 0)
 local NON_DOMINANT_OFFSET = Vector3.new(0, 0, -3) -- 3 studs directly in front
 local CONFIG_FILE = "KAT_Sync_Config_" .. tostring(LocalPlayer.Name) .. ".json"
