@@ -506,19 +506,30 @@ local function Main(StatusLabel, GemLabel)
 
         local backpack = LocalPlayer:FindFirstChild("Backpack")
         local function EnsureKnifeEquipped()
-            -- Force re-evaluate humanoid and backpack in case of resets
-            local h = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            -- Force re-evaluate humanoid and character in case of resets
+            local char = LocalPlayer.Character
+            local h = char and char:FindFirstChildOfClass("Humanoid")
             if not h then return false end
             
-            -- If already holding a tool (hopefully knife), we are good
-            local currentTool = LocalPlayer.Character:FindFirstChildOfClass("Tool")
-            if currentTool then return true end
+            -- If already holding a tool and it's parented to character, we are good
+            local currentTool = char:FindFirstChildOfClass("Tool")
+            if currentTool and currentTool.Parent == char then return true end
             
             local bp = LocalPlayer:FindFirstChild("Backpack")
             if h and bp then
+                -- Priority 1: Specifically named "Knife"
                 for _, item in ipairs(bp:GetChildren()) do
-                    if item.Name:lower():find("knife") or item:IsA("Tool") then
+                    if item:IsA("Tool") and item.Name:lower() == "knife" then
                         pcall(function() h:EquipTool(item) end)
+                        task.wait(0.2)
+                        return true
+                    end
+                end
+                -- Priority 2: Anything that looks like a tool/knife
+                for _, item in ipairs(bp:GetChildren()) do
+                    if item:IsA("Tool") or item.Name:lower():find("knife") then
+                        pcall(function() h:EquipTool(item) end)
+                        task.wait(0.2)
                         return true
                     end
                 end
