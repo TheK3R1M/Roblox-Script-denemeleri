@@ -172,8 +172,8 @@ local function CreateGUI()
     MainFrame.Name = "MainFrame"
     MainFrame.Parent = ScreenGui
     MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-    MainFrame.Position = UDim2.new(0.2, -100, 0.2, -75)
-    MainFrame.Size = UDim2.new(0, 200, 0, 150)
+    MainFrame.Position = UDim2.new(0.5, -100, 0.5, -100)
+    MainFrame.Size = UDim2.new(0, 200, 0, 200)
     MainFrame.Active = true
     MainFrame.Draggable = true
 
@@ -236,34 +236,34 @@ local function CreateGUI()
     StatsFrame.Name = "StatsFrame"
     StatsFrame.Parent = MainFrame
     StatsFrame.BackgroundTransparency = 1
-    StatsFrame.Position = UDim2.new(0, 0, 1, 5)
-    StatsFrame.Size = UDim2.new(1, 0, 0.4, 0)
+    StatsFrame.Position = UDim2.new(0.05, 0, 0.65, 0)
+    StatsFrame.Size = UDim2.new(0.9, 0, 0.3, 0)
 
     local UIListLayout = Instance.new("UIListLayout")
     UIListLayout.Parent = StatsFrame
     UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    UIListLayout.Padding = UDim.new(0, 5)
+    UIListLayout.Padding = UDim.new(0, 2)
     UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
     StatusLabel.Name = "StatusLabel"
     StatusLabel.Parent = StatsFrame
     StatusLabel.BackgroundTransparency = 1
-    StatusLabel.Size = UDim2.new(1, 0, 0.5, 0)
+    StatusLabel.Size = UDim2.new(1, 0, 0.4, 0)
     StatusLabel.Font = Enum.Font.Gotham
     StatusLabel.Text = "Waiting to Start..."
     StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-    StatusLabel.TextSize = 12
+    StatusLabel.TextSize = 11
     StatusLabel.LayoutOrder = 1
 
     local GemLabel = Instance.new("TextLabel")
     GemLabel.Name = "GemLabel"
     GemLabel.Parent = StatsFrame
     GemLabel.BackgroundTransparency = 1
-    GemLabel.Size = UDim2.new(1, 0, 0.5, 0)
+    GemLabel.Size = UDim2.new(1, 0, 0.4, 0)
     GemLabel.Font = Enum.Font.GothamBold
     GemLabel.Text = "💎 Farmed: " .. tostring(Config.SessionGems)
     GemLabel.TextColor3 = Color3.fromRGB(0, 255, 255)
-    GemLabel.TextSize = 13
+    GemLabel.TextSize = 12
     GemLabel.LayoutOrder = 2
 
     ToggleBtn.MouseButton1Click:Connect(function()
@@ -423,28 +423,29 @@ local function StartAppThreads(StatusLabel, GemLabel)
     task.spawn(function()
         while not scriptState.Destroyed do
             if not scriptState.Stopped then
-                local current = GetCurrentGems()
-                if current ~= nil then
-                    if Config.InitialGems == -1 then
-                        Config.InitialGems = current
-                        SaveConfig()
+                    local current = GetCurrentGems()
+                    if current ~= nil then
+                        if Config.InitialGems == -1 then
+                            Config.InitialGems = current
+                            SaveConfig()
+                        end
+                        
+                        -- Logic: If we reset, earned starts at 0. Across hops, SessionGems accumulates.
+                        local diff = current - Config.InitialGems
+                        if diff < 0 then
+                            -- Gems spent or UI reset
+                            Config.InitialGems = current
+                            diff = 0
+                        end
+                        
+                        Config.SessionGems = diff
+                        
+                        local newText = "💎 Session: " .. tostring(Config.SessionGems) .. " | Total: " .. tostring(current)
+                        if GemLabel.Text ~= newText then
+                            GemLabel.Text = newText
+                            SaveConfig()
+                        end
                     end
-                    
-                    local earned = current - Config.InitialGems
-                    if earned < 0 then
-                        Config.InitialGems = current
-                        earned = 0
-                        SaveConfig()
-                    end
-                    
-                    Config.SessionGems = earned
-                    
-                    local newText = "💎 Farmed: " .. tostring(earned) .. " | Total: " .. tostring(current)
-                    if GemLabel.Text ~= newText then
-                        GemLabel.Text = newText
-                        SaveConfig()
-                    end
-                end
             end
             task.wait(2)
         end
