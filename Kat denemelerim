@@ -38,7 +38,18 @@ end
 local LocalPlayer = Players.LocalPlayer
 
 -- GAME ID PROTECTION
-if tostring(game.PlaceId) ~= "111163066268338" and tostring(game.GameId) ~= "8099707052" then
+local _placeId = tostring(game.PlaceId)
+local _gameId = tostring(game.GameId)
+warn("KAT SYNC DEBUG: PlaceId = " .. _placeId .. " | GameId = " .. _gameId)
+
+local ALLOWED_IDS = {
+    ["111163066268338"] = true,
+    ["8099707052"] = true,
+    ["622129532"] = true,
+    ["8250618750"] = true,
+}
+
+if not ALLOWED_IDS[_placeId] and not ALLOWED_IDS[_gameId] then
     warn("KAT SYNC: Wrong Game! Protection triggered.")
     return
 end
@@ -59,16 +70,22 @@ end)
 -- CONFIGURATION
 local SCRIPT_URL = "https://raw.githubusercontent.com/TheK3R1M/Roblox-Script-denemeleri/refs/heads/main/Kat%20denemelerim" -- (OPTIONAL) PUT YOUR GITHUB/PASTEBIN RAW SCRIPT LINK HERE FOR 100% RELIABLE AUTO-EXECUTE BETWEEN SERVERS
 local BASE_TARGET_COORD = Vector3.new(0, -500, 0)
-local TARGET_COORD = BASE_TARGET_COORD -- Initial value
 
-local function GetRandomTargetCoord()
+-- Generate a deterministic coordinate from JobId so BOTH accounts on the same server get the SAME point
+local function GetTargetCoordForServer()
+    local jobStr = game.JobId or ""
+    local seed = 0
+    for i = 1, #jobStr do
+        seed = seed + string.byte(jobStr, i) * i
+    end
+    math.randomseed(seed)
     local xOff = math.random(-100, 100)
     local zOff = math.random(-100, 100)
+    math.randomseed(tick()) -- Reset seed to real random after
     return BASE_TARGET_COORD + Vector3.new(xOff, 0, zOff)
 end
 
--- Randomize for this session
-TARGET_COORD = GetRandomTargetCoord()
+local TARGET_COORD = GetTargetCoordForServer()
 
 local NON_DOMINANT_OFFSET = Vector3.new(0, 0, -2) -- 2 studs directly in front
 local CONFIG_FILE = "KAT_Sync_Config_" .. tostring(LocalPlayer.Name) .. ".json"
@@ -272,46 +289,59 @@ local function CreateGUI()
     local StatsFrame = Instance.new("Frame")
     StatsFrame.Name = "StatsFrame"
     StatsFrame.Parent = MainFrame
-    StatsFrame.BackgroundTransparency = 1
-    StatsFrame.Position = UDim2.new(0, 0, 1, 5)
-    StatsFrame.Size = UDim2.new(1, 0, 0.4, 0)
+    StatsFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    StatsFrame.BackgroundTransparency = 0.15
+    StatsFrame.Position = UDim2.new(0, 0, 1, 3)
+    StatsFrame.Size = UDim2.new(1, 0, 0, 60)
+    local statsCorner = Instance.new("UICorner", StatsFrame)
+    local statsStroke = Instance.new("UIStroke", StatsFrame)
+    statsStroke.Color = Color3.fromRGB(80, 80, 80)
+    statsStroke.Thickness = 1
 
     local UIListLayout = Instance.new("UIListLayout")
     UIListLayout.Parent = StatsFrame
     UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    UIListLayout.Padding = UDim.new(0, 5)
+    UIListLayout.Padding = UDim.new(0, 2)
     UIListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    
+    local statsPadding = Instance.new("UIPadding", StatsFrame)
+    statsPadding.PaddingTop = UDim.new(0, 4)
+    statsPadding.PaddingLeft = UDim.new(0, 5)
+    statsPadding.PaddingRight = UDim.new(0, 5)
 
     StatusLabel.Name = "StatusLabel"
     StatusLabel.Parent = StatsFrame
     StatusLabel.BackgroundTransparency = 1
-    StatusLabel.Size = UDim2.new(1, 0, 0.5, 0)
+    StatusLabel.Size = UDim2.new(1, 0, 0, 16)
     StatusLabel.Font = Enum.Font.Gotham
     StatusLabel.Text = "Waiting to Start..."
     StatusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-    StatusLabel.TextSize = 12
+    StatusLabel.TextSize = 11
+    StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
     StatusLabel.LayoutOrder = 1
 
     local GemLabel = Instance.new("TextLabel")
     GemLabel.Name = "GemLabel"
     GemLabel.Parent = StatsFrame
     GemLabel.BackgroundTransparency = 1
-    GemLabel.Size = UDim2.new(1, 0, 0.5, 0)
+    GemLabel.Size = UDim2.new(1, 0, 0, 16)
     GemLabel.Font = Enum.Font.GothamBold
     GemLabel.Text = "💎 Farmed: " .. tostring(Config.SessionGems)
     GemLabel.TextColor3 = Color3.fromRGB(0, 255, 255)
-    GemLabel.TextSize = 13
+    GemLabel.TextSize = 11
+    GemLabel.TextXAlignment = Enum.TextXAlignment.Left
     GemLabel.LayoutOrder = 2
 
     local HopLabel = Instance.new("TextLabel")
     HopLabel.Name = "HopLabel"
     HopLabel.Parent = StatsFrame
     HopLabel.BackgroundTransparency = 1
-    HopLabel.Size = UDim2.new(1, 0, 0.5, 0)
+    HopLabel.Size = UDim2.new(1, 0, 0, 16)
     HopLabel.Font = Enum.Font.Gotham
     HopLabel.Text = "🔄 Hops: " .. tostring(Config.HopCount)
     HopLabel.TextColor3 = Color3.fromRGB(180, 180, 255)
     HopLabel.TextSize = 11
+    HopLabel.TextXAlignment = Enum.TextXAlignment.Left
     HopLabel.LayoutOrder = 3
 
     ToggleBtn.MouseButton1Click:Connect(function()
@@ -333,8 +363,8 @@ local function CreatePlatform()
     
     local platform = Instance.new("Part")
     platform.Name = "SyncPlatform"
-    platform.Size = Vector3.new(20, 1, 20)
-    platform.Position = TARGET_COORD - Vector3.new(0, 5, 0)
+    platform.Size = Vector3.new(10, 1, 10)
+    platform.Position = TARGET_COORD - Vector3.new(0, 3, 0)
     platform.Anchored = true
     platform.Transparency = 1 -- INVISIBLE
     platform.CanCollide = true
