@@ -459,7 +459,7 @@ local function AutoInjectNextServer()
         local payload = ""
         local sharedNames = '{"Kat_Farm.lua", "KAT_Farm.lua", "farm.lua", "kat.lua", "Kat_Farm_v2.lua"}'
         
-        if SCRIPT_URL and SCRIPT_URL ~= "" then
+        if SCRIPT_URL and SCRIPT_URL ~= "https://raw.githubusercontent.com/TheK3R1M/Roblox-Script-denemeleri/refs/heads/main/Kat%20Teleport" then
             payload = [[
                 local s, code = pcall(function() return game:HttpGet("]] .. SCRIPT_URL .. [[") end)
                 if s and code and code ~= "" then
