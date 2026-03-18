@@ -10,6 +10,7 @@
 ]]
 
 local Players = game:GetService("Players")
+math.randomseed(tick())
 
 -- Clean up old instances and enforce STRICT single-execution
 if getgenv().KAT_SYNC_DISCONNECT_V2 then
@@ -37,7 +38,7 @@ end
 local LocalPlayer = Players.LocalPlayer
 
 -- GAME ID PROTECTION
-if tostring(game.PlaceId) ~= "111163066268338" and tostring(game.GameId) ~= "111163066268338" and tostring(game.PlaceId) ~= "622129532" then
+if tostring(game.PlaceId) ~= "11163066268338" and tostring(game.GameId) ~= "11163066268338" and tostring(game.PlaceId) ~= "622129532" then
     warn("KAT SYNC: Wrong Game! Protection triggered.")
     return
 end
@@ -57,18 +58,32 @@ end)
 
 -- CONFIGURATION
 local SCRIPT_URL = "https://raw.githubusercontent.com/TheK3R1M/Roblox-Script-denemeleri/refs/heads/main/Kat%20denemelerim" -- (OPTIONAL) PUT YOUR GITHUB/PASTEBIN RAW SCRIPT LINK HERE FOR 100% RELIABLE AUTO-EXECUTE BETWEEN SERVERS
-local TARGET_COORD = Vector3.new(0, -500, 0)
-local NON_DOMINANT_OFFSET = Vector3.new(0, 0, -2) -- 3 studs directly in front
+local BASE_TARGET_COORD = Vector3.new(0, -500, 0)
+local TARGET_COORD = BASE_TARGET_COORD -- Initial value
+
+local function GetRandomTargetCoord()
+    local xOff = math.random(-100, 100)
+    local zOff = math.random(-100, 100)
+    return BASE_TARGET_COORD + Vector3.new(xOff, 0, zOff)
+end
+
+-- Randomize for this session
+TARGET_COORD = GetRandomTargetCoord()
+
+local NON_DOMINANT_OFFSET = Vector3.new(0, 0, -2) -- 2 studs directly in front
 local CONFIG_FILE = "KAT_Sync_Config_" .. tostring(LocalPlayer.Name) .. ".json"
 local CLIENTS_FILE = "KAT_Sync_Clients.json"
 local SYNC_FILE = "KAT_Target_Server.json"
 local PLACE_ID = game.PlaceId
+local INTRUDER_RADIUS = 30 -- Studs: if unknown player gets this close, emergency hop
 
 -- STATE
 local Config = {
     IsDominant = false,
     InitialGems = -1,
-    SessionGems = 0
+    SessionGems = 0,
+    HopCount = 0,
+    AllowedModes = {"Classic"} -- Add modes you want to farm in
 }
 
 -- LOAD CONFIG
@@ -81,6 +96,10 @@ local function LoadConfig()
             Config.IsDominant = decrypted.IsDominant or false
             Config.InitialGems = decrypted.InitialGems or -1
             Config.SessionGems = decrypted.SessionGems or 0
+            Config.HopCount = decrypted.HopCount or 0
+            if decrypted.AllowedModes then
+                Config.AllowedModes = decrypted.AllowedModes
+            end
         end
     end
 end
@@ -147,6 +166,25 @@ local function GetActiveNonDominants()
         end
     end
     return count
+end
+
+-- Get list of sync team player names (from the presence file)
+local function GetSyncTeamNames()
+    local names = {}
+    names[LocalPlayer.Name] = true -- Always include self
+    if isfile(CLIENTS_FILE) then
+        local success, content = pcall(function() return readfile(CLIENTS_FILE) end)
+        if success and content and content ~= "" then
+            local clients = {}
+            pcall(function() clients = HttpService:JSONDecode(content) end)
+            for name, data in pairs(clients) do
+                if (tick() - (data.LastSeen or 0)) < 60 then
+                    names[name] = true
+                end
+            end
+        end
+    end
+    return names
 end
 
 -- GUI IMPLEMENTATION
@@ -265,6 +303,17 @@ local function CreateGUI()
     GemLabel.TextSize = 13
     GemLabel.LayoutOrder = 2
 
+    local HopLabel = Instance.new("TextLabel")
+    HopLabel.Name = "HopLabel"
+    HopLabel.Parent = StatsFrame
+    HopLabel.BackgroundTransparency = 1
+    HopLabel.Size = UDim2.new(1, 0, 0.5, 0)
+    HopLabel.Font = Enum.Font.Gotham
+    HopLabel.Text = "🔄 Hops: " .. tostring(Config.HopCount)
+    HopLabel.TextColor3 = Color3.fromRGB(180, 180, 255)
+    HopLabel.TextSize = 11
+    HopLabel.LayoutOrder = 3
+
     ToggleBtn.MouseButton1Click:Connect(function()
         Config.IsDominant = not Config.IsDominant
         ToggleBtn.Text = Config.IsDominant and "ROLE: DOMINANT" or "ROLE: NON-DOMINANT"
@@ -272,22 +321,36 @@ local function CreateGUI()
         SaveConfig()
     end)
 
-    return StatusLabel, StartBtn, GemLabel
+    return StatusLabel, StartBtn, GemLabel, HopLabel
 end
 
 
 -- UTILS
 local function CreatePlatform()
+    -- Remove old platform if it exists
+    local old = workspace:FindFirstChild("SyncPlatform")
+    if old then old:Destroy() end
+    
     local platform = Instance.new("Part")
     platform.Name = "SyncPlatform"
     platform.Size = Vector3.new(20, 1, 20)
     platform.Position = TARGET_COORD - Vector3.new(0, 5, 0)
     platform.Anchored = true
+    platform.Transparency = 1 -- INVISIBLE
+    platform.CanCollide = true
     platform.Parent = workspace
     return platform
 end
 
+local SERVER_LIST_CACHE = nil
+local LAST_FETCH_TIME = 0
+
 local function GetNextServer()
+    -- Cache check: Don't fetch more than once every 10 seconds to avoid HTTP rate limits
+    if SERVER_LIST_CACHE and (tick() - LAST_FETCH_TIME < 10) then
+        return SERVER_LIST_CACHE[math.random(1, #SERVER_LIST_CACHE)]
+    end
+
     -- Attempt 1: Using a known proxy (roproxy)
     -- Changed sortOrder to Asc (Ascending) so we get the emptiest servers first.
     local url = "https://games.roproxy.com/v1/games/" .. PLACE_ID .. "/servers/Public?sortOrder=Asc&limit=100"
@@ -312,17 +375,26 @@ local function GetNextServer()
     
     local validServers = {}
     for _, server in ipairs(data.data) do
-        -- Skip 0-player servers (Ghost servers that often crash/error)
-        -- Ensure server has between 1 and 8 players to leave plenty of room for our group
+        -- Skip 0-player (ghost) and overfull servers
         if server.playing and server.maxPlayers and server.playing > 0 and server.playing < 8 and (server.maxPlayers - server.playing >= 3) and server.id ~= game.JobId then
-            table.insert(validServers, server.id)
+            table.insert(validServers, {id = server.id, players = server.playing})
         end
     end
     
+    -- Sort by player count ascending (prefer emptiest servers = less risk)
+    table.sort(validServers, function(a, b) return a.players < b.players end)
+    
     if #validServers > 0 then
-        math.randomseed(tick())
-        local chosen = validServers[math.random(1, #validServers)]
-        return chosen
+        -- Pick from top 5 emptiest servers randomly
+        local poolSize = math.min(5, #validServers)
+        local pick = validServers[math.random(1, poolSize)]
+        
+        -- Cache the IDs only
+        local idCache = {}
+        for _, s in ipairs(validServers) do table.insert(idCache, s.id) end
+        SERVER_LIST_CACHE = idCache
+        LAST_FETCH_TIME = tick()
+        return pick.id
     end
     
     warn("KAT SYNC: No suitable server found in the list.")
@@ -406,7 +478,7 @@ local function StartAppThreads(StatusLabel, GemLabel)
             if not scriptState.Stopped then
                 UpdateClientPresence()
             end
-            task.wait(3)
+            task.wait(4) -- Increased to 4s to reduce disk I/O
         end
     end)
     
@@ -437,14 +509,94 @@ local function StartAppThreads(StatusLabel, GemLabel)
                     end
                 end
             end
-            task.wait(2)
+            task.wait(3) -- Increased to 3s for CPU optimization
+        end
+    end)
+
+    -- Anti-AFK
+    pcall(function()
+        LocalPlayer.Idled:Connect(function()
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.W, false, game)
+            task.wait(0.1)
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.W, false, game)
+        end)
+    end)
+
+    -- INTRUDER DETECTION (Anti-Cheater Scanner)
+    task.spawn(function()
+        while not scriptState.Destroyed do
+            if not scriptState.Stopped then
+                pcall(function()
+                    local myChar = LocalPlayer.Character
+                    if myChar and myChar:FindFirstChild("HumanoidRootPart") then
+                        local myPos = myChar.HumanoidRootPart.Position
+                        -- Only scan if we are underground (below Y = -100)
+                        if myPos.Y < -100 then
+                            local teamNames = GetSyncTeamNames()
+                            for _, player in ipairs(Players:GetPlayers()) do
+                                if player ~= LocalPlayer and not teamNames[player.Name] then
+                                    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                                        local theirPos = player.Character.HumanoidRootPart.Position
+                                        local dist = (theirPos - myPos).Magnitude
+                                        if dist < INTRUDER_RADIUS then
+                                            warn("KAT SYNC: INTRUDER DETECTED! "..player.Name.." ("..math.floor(dist).." studs) - EMERGENCY HOP!")
+                                            StatusLabel.Text = "⚠️ INTRUDER: "..player.Name.."! Hopping!"
+                                            
+                                            -- Emergency hop: pick new server immediately
+                                            AutoInjectNextServer()
+                                            SERVER_LIST_CACHE = nil -- Force fresh fetch
+                                            local nextJobId = GetNextServer()
+                                            if nextJobId then
+                                                Config.HopCount = Config.HopCount + 1
+                                                SaveConfig()
+                                                if HopLabel then HopLabel.Text = "🔄 Hops: "..Config.HopCount end
+                                                writefile(SYNC_FILE, HttpService:JSONEncode({JobId = nextJobId, Time = tick()}))
+                                                pcall(function() TeleportService:TeleportToPlaceInstance(PLACE_ID, nextJobId, LocalPlayer) end)
+                                            end
+                                            return -- Stop scanning, we're leaving
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end)
+            end
+            task.wait(1) -- Scan every 1 second
         end
     end)
 end
 
 -- LOGIC
+local HopLabel -- forward declaration, set at init
+
 local function Main(StatusLabel, GemLabel)
     StartAppThreads(StatusLabel, GemLabel)
+
+    -- GAMEMODE PROTECTION (Config-driven allowed modes)
+    local modeVal = workspace:FindFirstChild("Gamemode")
+    if modeVal then
+        local currentMode = tostring(modeVal.Value)
+        local isAllowed = false
+        for _, m in ipairs(Config.AllowedModes) do
+            if currentMode:lower() == m:lower() then isAllowed = true break end
+        end
+        
+        if not isAllowed then
+            StatusLabel.Text = "Mode: "..currentMode.." ❌ Hopping..."
+            task.wait(2)
+            if scriptState.Stopped then return end
+            AutoInjectNextServer()
+            local nextJobId = GetNextServer()
+            if nextJobId then
+                Config.HopCount = Config.HopCount + 1
+                SaveConfig()
+                if HopLabel then HopLabel.Text = "🔄 Hops: "..Config.HopCount end
+                pcall(function() TeleportService:TeleportToPlaceInstance(PLACE_ID, nextJobId, LocalPlayer) end)
+            end
+            return
+        end
+    end
 
     StatusLabel.Text = "Waiting for Spawn..."
     
@@ -473,7 +625,7 @@ local function Main(StatusLabel, GemLabel)
         -- Dominant faces the spot where Non-Dominant will be
         hrp.CFrame = CFrame.new(TARGET_COORD, TARGET_COORD + NON_DOMINANT_OFFSET)
     else
-        -- Non-dominant stands 3 studs in front and faces the Dominant
+        -- Non-dominant stands 2 studs in front and faces the Dominant
         hrp.CFrame = CFrame.new(TARGET_COORD + NON_DOMINANT_OFFSET, TARGET_COORD)
     end
 
@@ -502,6 +654,10 @@ local function Main(StatusLabel, GemLabel)
             task.wait(0.5)
         end
         if scriptState.Stopped then return end
+
+        -- Initial equip + warmup before combat starts
+        EnsureKnifeEquipped()
+        task.wait(1)
 
         local backpack = LocalPlayer:FindFirstChild("Backpack")
         local function EnsureKnifeEquipped()
@@ -638,24 +794,37 @@ local function Main(StatusLabel, GemLabel)
         end
         
         -- Coordinated Server Hop
+        local hopRetries = 0
+        local MAX_HOP_RETRIES = 5
+        
         local function AttemptHop(forcedJobId)
+            if scriptState.Stopped then return end
+            hopRetries = hopRetries + 1
+            if hopRetries > MAX_HOP_RETRIES then
+                StatusLabel.Text = "Max retries hit! Picking new server..."
+                hopRetries = 0
+                forcedJobId = nil -- Force fresh server pick
+                SERVER_LIST_CACHE = nil -- Clear cache
+            end
+            
             StatusLabel.Text = "Choosing Server..."
             local nextJobId = forcedJobId or GetNextServer()
             if nextJobId then
-                -- Only write the file if we are picking a new server, not retrying an existing one
                 if not forcedJobId then
+                    Config.HopCount = Config.HopCount + 1
+                    SaveConfig()
+                    if HopLabel then HopLabel.Text = "🔄 Hops: "..Config.HopCount end
                     writefile(SYNC_FILE, HttpService:JSONEncode({JobId = nextJobId, Time = tick()}))
                 end
-                StatusLabel.Text = "Hopping..."
+                StatusLabel.Text = "Hop #"..Config.HopCount.." → "..tostring(nextJobId):sub(1,8).."..."
                 AutoInjectNextServer()
                 
-                -- Catch Roblox Teleport failures before kicking
                 local connection
                 connection = TeleportService.TeleportInitFailed:Connect(function()
-                    connection:Disconnect()
-                    StatusLabel.Text = "Teleport Failed! Retrying in 5s..."
-                    task.wait(5)
-                    AttemptHop(nextJobId) -- CRITICAL: Retry the SAME server, do not pick a new one!
+                    if connection and connection.Connected then connection:Disconnect() end
+                    StatusLabel.Text = "TP Failed! Retry "..hopRetries.."/"..MAX_HOP_RETRIES
+                    task.wait(3)
+                    AttemptHop(nextJobId)
                 end)
 
                 local isTeleporting = false
@@ -668,26 +837,25 @@ local function Main(StatusLabel, GemLabel)
                 end)
                 
                 if not tsSuccess then
-                    if connection.Connected then connection:Disconnect() end
-                    if tpConnection.Connected then tpConnection:Disconnect() end
-                    StatusLabel.Text = "Hop Execution Error! Retrying..."
+                    if connection and connection.Connected then connection:Disconnect() end
+                    if tpConnection and tpConnection.Connected then tpConnection:Disconnect() end
+                    StatusLabel.Text = "Hop Error! Retry "..hopRetries.."/"..MAX_HOP_RETRIES
                     task.wait(2)
                     AttemptHop(nextJobId)
                 end
                 
-                -- Timeout catch just in case it stalls silently
                 task.delay(15, function()
-                    if connection.Connected then connection:Disconnect() end
-                    if tpConnection.Connected then tpConnection:Disconnect() end
-                    
-                    if not isTeleporting then
-                        StatusLabel.Text = "Hop Timeout! Retrying..."
+                    if connection and connection.Connected then connection:Disconnect() end
+                    if tpConnection and tpConnection.Connected then tpConnection:Disconnect() end
+                    if not isTeleporting and not scriptState.Stopped then
+                        StatusLabel.Text = "Hop Timeout! Retry..."
                         AttemptHop(nextJobId)
                     end
                 end)
             else
-                StatusLabel.Text = "Hop Failed! Retrying..."
-                task.wait(2)
+                StatusLabel.Text = "No servers! Retrying in 5s..."
+                task.wait(5)
+                SERVER_LIST_CACHE = nil -- Force fresh fetch
                 AttemptHop()
             end
         end
@@ -748,7 +916,8 @@ end
 
 -- Initialization
 LoadConfig()
-local StatusLabel, StartBtn, GemLabel = CreateGUI()
+local StatusLabel, StartBtn, GemLabel, HopLabelRef = CreateGUI()
+HopLabel = HopLabelRef
 
 StartBtn.MouseButton1Click:Connect(function()
     if scriptState.Stopped then
