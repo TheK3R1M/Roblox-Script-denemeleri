@@ -71,8 +71,8 @@ local SCRIPT_URL = "" -- PUT YOUR RAW SCRIPT URL HERE FOR AUTO-EXECUTE
 local PLACE_ID = game.PlaceId
 local CONFIG_FILE = "KAT_Farm_Config_" .. LocalPlayer.Name .. ".json"
 
-local ATTACK_OFFSET = 5          -- Distance from target
-local ATTACK_COOLDOWN = 0.1      -- Faster clicks
+local ATTACK_OFFSET = 2          -- Distance from target
+local ATTACK_COOLDOWN = 0.05     -- VERY FAST
 local SERVER_HOP_INTERVAL = 900  
 local KILL_SCAN_INTERVAL = 0.05  -- Faster target scan
 local ORBIT_SPEED = 15           -- Speed of orbiting around target
@@ -240,7 +240,7 @@ end
 local function AttackTarget()
     local viewportSize = workspace.CurrentCamera.ViewportSize
     VirtualInputManager:SendMouseButtonEvent(viewportSize.X / 2, viewportSize.Y / 2, 0, true, game, 0)
-    task.wait(0.1)
+    task.wait(0.05) -- Click hold time
     VirtualInputManager:SendMouseButtonEvent(viewportSize.X / 2, viewportSize.Y / 2, 0, false, game, 0)
 end
 
@@ -793,7 +793,7 @@ local function Main(StatusLabel, KillLabel, HopLabel, TimerLabel)
                 StartFlyLock(bestTarget)
                 
                 local atkAttempts = 0
-                local MAX_ATK = 20
+                local MAX_ATK = 40
                 
                 while not scriptState.Stopped 
                     and IsPlayerAlive(bestTarget) 
