@@ -71,10 +71,11 @@ local SCRIPT_URL = "" -- PUT YOUR RAW SCRIPT URL HERE FOR AUTO-EXECUTE
 local PLACE_ID = game.PlaceId
 local CONFIG_FILE = "KAT_Farm_Config_" .. LocalPlayer.Name .. ".json"
 
-local ATTACK_OFFSET = 2          -- Studs from target
-local ATTACK_COOLDOWN = 0.15     -- Seconds between clicks (FAST)
-local SERVER_HOP_INTERVAL = 900  -- 15 minutes (in seconds)
-local KILL_SCAN_INTERVAL = 0.1   -- How fast to scan for targets
+local ATTACK_OFFSET = 5          -- Distance from target
+local ATTACK_COOLDOWN = 0.1      -- Faster clicks
+local SERVER_HOP_INTERVAL = 900  
+local KILL_SCAN_INTERVAL = 0.05  -- Faster target scan
+local ORBIT_SPEED = 15           -- Speed of orbiting around target
 
 local Config = {
     TotalKills = 0,
@@ -161,47 +162,40 @@ local flyBodyVelocity = nil
 local flyLockTarget = nil
 local flyOffset = Vector3.new(0, 0, 2) -- Will be randomized
 
--- Generate a random point on a sphere around the target
-local function RandomSphereOffset()
-    -- Random angle horizontally (0-360)
-    local angle = math.rad(math.random(0, 360))
-    -- Random vertical: -1 (below) to 1.5 (above) — slight bias upward
-    local yOff = math.random(-10, 15) / 10
-    local dist = ATTACK_OFFSET
-    
-    return Vector3.new(
-        math.cos(angle) * dist,
-        yOff,
-        math.sin(angle) * dist
-    )
-end
+-- Orbit logic is now within StartFlyLock for dynamic rotation
+
 
 local function StartFlyLock(targetPlayer)
     StopFlyLock() -- Clean previous lock
     flyLockTarget = targetPlayer
-    flyOffset = RandomSphereOffset() -- Random direction for this lock
     
     local char = LocalPlayer.Character
     if not char then return end
     local hrp = char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
     
-    -- Zero-gravity: BodyVelocity cancels all physics movement
+    -- Zero-gravity BodyVelocity
     flyBodyVelocity = Instance.new("BodyVelocity")
     flyBodyVelocity.Velocity = Vector3.new(0, 0, 0)
     flyBodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
     flyBodyVelocity.P = 10000
     flyBodyVelocity.Parent = hrp
     
-    -- RenderStepped: Lock position to target EVERY FRAME
-    flyLockConnection = RunService.RenderStepped:Connect(function()
+    local orbitAngle = 0
+    -- RenderStepped: Fast 3D Orbiting Lock
+    flyLockConnection = RunService.RenderStepped:Connect(function(dt)
         local tChar = flyLockTarget and flyLockTarget.Character
         local tHRP = tChar and tChar:FindFirstChild("HumanoidRootPart")
         local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
         
         if tHRP and myHRP then
-            -- Position at random offset, always facing target
-            local targetPos = tHRP.Position + flyOffset
+            orbitAngle = orbitAngle + (dt * ORBIT_SPEED)
+            -- 3D Circular Offset with slight height Bobbing
+            local x = math.cos(orbitAngle) * ATTACK_OFFSET
+            local z = math.sin(orbitAngle) * ATTACK_OFFSET
+            local y = math.sin(orbitAngle * 0.5) * (ATTACK_OFFSET * 0.5)
+            
+            local targetPos = tHRP.Position + Vector3.new(x, y, z)
             myHRP.CFrame = CFrame.new(targetPos, tHRP.Position)
         end
     end)
