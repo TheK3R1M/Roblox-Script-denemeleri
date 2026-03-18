@@ -38,7 +38,7 @@ end
 local LocalPlayer = Players.LocalPlayer
 
 -- GAME ID PROTECTION
-if tostring(game.PlaceId) ~= "11163066268338" and tostring(game.GameId) ~= "11163066268338" and tostring(game.PlaceId) ~= "622129532" then
+if tostring(game.PlaceId) ~= "111163066268338" and tostring(game.GameId) ~= "8099707052" then
     warn("KAT SYNC: Wrong Game! Protection triggered.")
     return
 end
