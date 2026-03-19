@@ -633,6 +633,34 @@ local function Main(StatusLabel, KillLabel, HopLabel, TimerLabel)
         end)
     end)
 
+    -- 🛡️ Anti-Void & Anti-Sit (Background)
+    local mySession = scriptState.SessionId
+    task.spawn(function()
+        while not scriptState.Destroyed and scriptState.SessionId == mySession do
+            if not scriptState.Stopped then
+                local char = LocalPlayer.Character
+                local h = char and char:FindFirstChildOfClass("Humanoid")
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+
+                if h and hrp then
+                    -- 🛑 Anti-Sit
+                    if h.Sit then
+                        h.Sit = false
+                        h:ChangeState(Enum.HumanoidStateType.Jump)
+                    end
+
+                    -- 🌌 Anti-Void
+                    if hrp.Position.Y < -50 then
+                        Log("VOID DETECTED! Teleporting to safety.")
+                        hrp.Velocity = Vector3.new(0, 0, 0)
+                        hrp.CFrame = CFrame.new(0, 50, 0) -- Teleport to a default "Sky" position
+                    end
+                end
+            end
+            task.wait(0.3)
+        end
+    end)
+
     -- Vote Kick Scanner (background)
     local mySession = scriptState.SessionId
     task.spawn(function()
