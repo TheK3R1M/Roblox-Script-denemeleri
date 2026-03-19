@@ -157,10 +157,34 @@ end
 -- ═══════════════════════════════════════
 -- FLY-LOCK SYSTEM
 -- ═══════════════════════════════════════
-local flyLockConnection = nil
-local flyBodyVelocity = nil
-local flyLockTarget = nil
-local flyOffset = Vector3.new(0, 0, 2) -- Will be randomized
+-- 🛡️ CHEATER DETECTION (RADAR)
+local CheaterRadar = {}
+local prevPositions = {}
+
+task.spawn(function()
+    while task.wait(0.5) do
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character then
+                local hrp = p.Character:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    local currPos = hrp.Position
+                    local prevPos = prevPositions[p.Name]
+                    if prevPos then
+                        local dist = (currPos - prevPos).Magnitude
+                        -- If they moved > 60 studs in 0.5s while not falling fast
+                        if dist > 60 and hrp.Velocity.Y > -50 then
+                            if not CheaterRadar[p.Name] then
+                                Log("CHEATER DETECTED:", p.Name)
+                                CheaterRadar[p.Name] = true
+                            end
+                        end
+                    end
+                    prevPositions[p.Name] = currPos
+                end
+            end
+        end
+    end
+end)
 
 -- Orbit logic is now within StartFlyLock for dynamic rotation
 
@@ -190,13 +214,30 @@ local function StartFlyLock(targetPlayer)
         
         if tHRP and myHRP then
             orbitAngle = orbitAngle + (dt * ORBIT_SPEED)
-            -- 3D Circular Offset with slight height Bobbing
+            
+            -- Detect if target has a knife
+            local isKnife = false
+            for _, item in ipairs(tChar:GetChildren()) do
+                if item:IsA("Tool") and item.Name:lower():find("knife") then
+                    isKnife = true
+                    break
+                end
+            end
+
+            -- 🌀 ORBIT GEOMETRY
             local x = math.cos(orbitAngle) * ATTACK_OFFSET
             local z = math.sin(orbitAngle) * ATTACK_OFFSET
             local y = math.sin(orbitAngle * 0.5) * (ATTACK_OFFSET * 0.5)
             
-            local targetPos = tHRP.Position + Vector3.new(x, y, z)
-            myHRP.CFrame = CFrame.new(targetPos, tHRP.Position)
+            local targetCFrame = tHRP.CFrame
+            if isKnife then
+                -- Target has a knife, stay behind them (Backstab Focus)
+                -- We offset the entire orbit center to 4.5 studs behind the player
+                targetCFrame = tHRP.CFrame * CFrame.new(0, 0, 4.5)
+            end
+
+            local finalPos = (targetCFrame * CFrame.new(x, y, z)).Position
+            myHRP.CFrame = CFrame.new(finalPos, tHRP.Position)
         end
     end)
 end
@@ -765,7 +806,23 @@ local function Main(StatusLabel, KillLabel, HopLabel, TimerLabel)
             bestTarget = nil
         end
         
-        -- PRIORITY 2: Fallback to nearest alive enemy (with rotation cycle)
+        -- PRIORITY 2: Focus Cheaters/Exploiters
+        if not bestTarget then
+            for name, isCheat in pairs(CheaterRadar) do
+                if isCheat then
+                    local p = Players:FindFirstChild(name)
+                    if p and IsPlayerAlive(p) and IsEnemy(p) then
+                        bestTarget = p
+                        Log("RADAR FOCUS: Targeting Cheater", p.Name)
+                        break
+                    else
+                        CheaterRadar[name] = nil -- Player left or died
+                    end
+                end
+            end
+        end
+
+        -- PRIORITY 3: Fallback to nearest alive enemy (with rotation cycle)
         if not bestTarget then
             local bestDist = math.huge
             local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
