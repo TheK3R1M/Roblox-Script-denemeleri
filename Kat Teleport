@@ -81,6 +81,7 @@ local Config = {
     TotalKills = 0,
     SessionKills = 0,
     HopCount = 0,
+    AttackMode = "Orbit" -- Orbit or Under
 }
 
 local DEBUG_MODE = true
@@ -232,11 +233,19 @@ local function StartFlyLock(targetPlayer)
             local targetCFrame = tHRP.CFrame
             if isKnife then
                 -- Target has a knife, stay behind them (Backstab Focus)
-                -- We offset the entire orbit center to 4.5 studs behind the player
                 targetCFrame = tHRP.CFrame * CFrame.new(0, 0, 4.5)
             end
 
-            local finalPos = (targetCFrame * CFrame.new(x, y, z)).Position
+            local finalPos
+            if Config.AttackMode == "Under" then
+                -- ⬇️ UNDER TARGET MODE
+                -- Stay below their feet (Offset is added down)
+                finalPos = tHRP.Position + Vector3.new(0, -ATTACK_OFFSET, 0)
+            else
+                -- 🌀 ORBIT MODE
+                finalPos = (targetCFrame * CFrame.new(x, y, z)).Position
+            end
+
             myHRP.CFrame = CFrame.new(finalPos, tHRP.Position)
         end
     end)
@@ -568,7 +577,7 @@ local function CreateGUI()
     MainFrame.Parent = ScreenGui
     MainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
     MainFrame.Position = UDim2.new(0, 10, 0.5, -80)
-    MainFrame.Size = UDim2.new(0, 220, 0, 160)
+    MainFrame.Size = UDim2.new(0, 220, 0, 185) -- Slightly bigger for new button
     MainFrame.Active = true
     MainFrame.Draggable = true
     local mainCorner = Instance.new("UICorner", MainFrame)
@@ -658,6 +667,31 @@ local function CreateGUI()
     local HopLabel = MakeLabel("Hops", "🔄 Hops: " .. Config.HopCount, Color3.fromRGB(180, 180, 255), 3)
     local TimerLabel = MakeLabel("Timer", "⏱️ Next Hop: 15:00", Color3.fromRGB(255, 200, 100), 4)
 
+    -- Toggle Attack Mode Button
+    local ModeBtn = Instance.new("TextButton")
+    ModeBtn.Parent = MainFrame
+    ModeBtn.Name = "ModeBtn"
+    ModeBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    ModeBtn.Position = UDim2.new(0.05, 0, 1, -25)
+    ModeBtn.Size = UDim2.new(0.9, 0, 0, 20)
+    ModeBtn.Font = Enum.Font.GothamBold
+    ModeBtn.Text = "Attack Mode: " .. Config.AttackMode:upper()
+    ModeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ModeBtn.TextSize = 12
+    local modeCorner = Instance.new("UICorner", ModeBtn)
+    modeCorner.CornerRadius = UDim.new(0, 5)
+
+    ModeBtn.MouseButton1Click:Connect(function()
+        if Config.AttackMode == "Orbit" then
+            Config.AttackMode = "Under"
+        else
+            Config.AttackMode = "Orbit"
+        end
+        ModeBtn.Text = "Attack Mode: " .. Config.AttackMode:upper()
+        Log("Attack Mode changed to:", Config.AttackMode)
+        SaveConfig()
+    end)
+
     return StatusLabel, StartBtn, KillLabel, HopLabel, TimerLabel
 end
 
@@ -684,7 +718,8 @@ local function Main(StatusLabel, KillLabel, HopLabel, TimerLabel)
                 local hrp = char and char:FindFirstChild("HumanoidRootPart")
 
                 if h and hrp then
-                    -- 🛑 Anti-Sit
+                    -- 🛑 Anti-Sit (FORCED)
+                    h:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
                     if h.Sit then
                         h.Sit = false
                         h:ChangeState(Enum.HumanoidStateType.Jump)
@@ -694,11 +729,11 @@ local function Main(StatusLabel, KillLabel, HopLabel, TimerLabel)
                     if hrp.Position.Y < -50 then
                         Log("VOID DETECTED! Teleporting to safety.")
                         hrp.Velocity = Vector3.new(0, 0, 0)
-                        hrp.CFrame = CFrame.new(0, 50, 0) -- Teleport to a default "Sky" position
+                        hrp.CFrame = CFrame.new(0, 10, 0) -- Teleport slightly above ground if possible, or sky
                     end
                 end
             end
-            task.wait(0.3)
+            task.wait(0.1) -- Faster monitor
         end
     end)
 
