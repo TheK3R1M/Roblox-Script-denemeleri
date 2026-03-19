@@ -239,8 +239,8 @@ local function StartFlyLock(targetPlayer)
             local finalPos
             if Config.AttackMode == "Under" then
                 -- ⬇️ UNDER TARGET MODE
-                -- Stay below their feet (Offset is added down)
-                finalPos = tHRP.Position + Vector3.new(0, -ATTACK_OFFSET, 0)
+                -- Close in for better hits (stiffer offset for under)
+                finalPos = tHRP.Position + Vector3.new(0, -4.5, 0)
             else
                 -- 🌀 ORBIT MODE
                 finalPos = (targetCFrame * CFrame.new(x, y, z)).Position
