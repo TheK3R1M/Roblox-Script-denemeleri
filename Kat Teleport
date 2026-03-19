@@ -392,6 +392,9 @@ end
 -- VOTE KICK DETECTION
 -- ═══════════════════════════════════════
 local function IsBeingVoteKicked()
+    local myName = LocalPlayer.Name:lower()
+    
+    -- Search 1: Specific KAT Votekick Panel
     local success, result = pcall(function()
         local subject = LocalPlayer.PlayerGui
             :FindFirstChild("GameUI")
@@ -407,11 +410,28 @@ local function IsBeingVoteKicked()
             elseif subject:IsA("StringValue") then
                 txt = subject.Value
             end
-            return txt == LocalPlayer.Name or txt:find(LocalPlayer.Name)
+            return txt:lower():find(myName)
         end
         return false
     end)
-    return success and result
+    if success and result then return true end
+
+    -- Search 2: Broad UI Scanner (Looks for current player name in any Votekick-like UI)
+    for _, gui in ipairs(LocalPlayer.PlayerGui:GetChildren()) do
+        if gui:IsA("ScreenGui") and (gui.Name:lower():find("vote") or gui.Name:lower():find("kick")) then
+            for _, desc in ipairs(gui:GetDescendants()) do
+                if (desc:IsA("TextLabel") or desc:IsA("TextButton")) and desc.Visible then
+                    local t = desc.Text:lower()
+                    if t:find(myName) and (t:find("kick") or t:find("vote")) then
+                        Log("UI RADAR: Vote kick detected in UI:", gui.Name)
+                        return true
+                    end
+                end
+            end
+        end
+    end
+
+    return false
 end
 
 -- ═══════════════════════════════════════
@@ -737,7 +757,37 @@ local function Main(StatusLabel, KillLabel, HopLabel, TimerLabel)
         end
     end)
 
-    -- Vote Kick Scanner (background)
+    -- 🛡️ Vote Kick Chat Radar (background)
+    task.spawn(function()
+        local function onMessage(msg, sender)
+            if sender == LocalPlayer then return end
+            local text = msg:lower()
+            local myName = LocalPlayer.Name:lower()
+            
+            -- Detect keywords like "kick name", "votekick name", "hacker name"
+            if text:find(myName) then
+                if text:find("kick") or text:find("hacker") or text:find("cheat") or text:find("report") then
+                    Log("CHAT RADAR: Possible kick attempt detected from", sender.Name)
+                    scriptState.Stopped = true
+                    DisableNoclip()
+                    EmergencyHop(StatusLabel, "CHAT DETECTION")
+                end
+            end
+        end
+
+        local chatService = game:GetService("TextChatService")
+        if chatService.ChatVersion == Enum.ChatVersion.TextChatService then
+            chatService.MessageReceived:Connect(function(msg)
+                onMessage(msg.Text, msg.TextSource and Players:GetPlayerByUserId(msg.TextSource.UserId))
+            end)
+        else
+            game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.OnMessageDoneFiltering.OnClientEvent:Connect(function(data)
+                onMessage(data.Message, Players:FindFirstChild(data.FromSpeaker))
+            end)
+        end
+    end)
+
+    -- Vote Kick UI Scanner (background)
     local mySession = scriptState.SessionId
     task.spawn(function()
         while not scriptState.Destroyed and scriptState.SessionId == mySession do
