@@ -884,11 +884,23 @@ local function Main(StatusLabel, KillLabel, HopLabel, TimerLabel)
         end
 
         -- PRIORITY 1: Read the game's assigned target from TargetUI
-        local bestTarget = GetAssignedTarget()
+        local assigned = GetAssignedTarget()
+        local bestTarget = nil
         
-        -- Validate assigned target is alive AND enemy
-        if bestTarget and (not IsPlayerAlive(bestTarget) or not IsEnemy(bestTarget)) then
-            bestTarget = nil
+        -- Validate assigned target is alive, enemy, NOT in rotation cooldown, and NOT in lobby (dist check)
+        if assigned and IsPlayerAlive(assigned) and IsEnemy(assigned) then
+            local lastAtk = skipList[assigned.Name] or 0
+            local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            local tHRP = assigned.Character and assigned.Character:FindFirstChild("HumanoidRootPart")
+            
+            if tick() - lastAtk > 1.5 then
+                if myHRP and tHRP then
+                    local dist = (myHRP.Position - tHRP.Position).Magnitude
+                    if dist < 500 then -- Ignore lobby players (usually > 1000 studs away)
+                        bestTarget = assigned
+                    end
+                end
+            end
         end
         
         -- PRIORITY 2: Focus Cheaters/Exploiters
