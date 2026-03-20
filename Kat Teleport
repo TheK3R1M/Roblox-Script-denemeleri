@@ -81,8 +81,9 @@ local Config = {
     TotalKills = 0,
     SessionKills = 0,
     HopCount = 0,
-    AttackMode = "Orbit", -- Orbit or Under
-    AutoHopLowPlayers = true -- Toggle for low player count hop
+    AttackMode = "Orbit",        -- Orbit or Under
+    AutoHopLowPlayers = true,    -- Hop when <= 1 other player left
+    HopOnHighLevel = true        -- Hop when a player with >= 200 level joins
 }
 
 local DEBUG_MODE = true
@@ -103,6 +104,10 @@ local function LoadConfig()
             local data = HttpService:JSONDecode(readfile(CONFIG_FILE))
             Config.TotalKills = data.TotalKills or 0
             Config.HopCount = data.HopCount or 0
+            -- Restore toggles from last session
+            if data.AutoHopLowPlayers ~= nil then Config.AutoHopLowPlayers = data.AutoHopLowPlayers end
+            if data.AttackMode ~= nil then Config.AttackMode = data.AttackMode end
+            if data.HopOnHighLevel ~= nil then Config.HopOnHighLevel = data.HopOnHighLevel end
         end)
     else
         Log("No config file found.")
@@ -598,7 +603,7 @@ local function CreateGUI()
     MainFrame.Parent = ScreenGui
     MainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
     MainFrame.Position = UDim2.new(0, 10, 0.5, -100)
-    MainFrame.Size = UDim2.new(0, 220, 0, 210) -- Bigger for more buttons
+    MainFrame.Size = UDim2.new(0, 220, 0, 235) -- Bigger for 3 toggle buttons
     MainFrame.Active = true
     MainFrame.Draggable = true
     local mainCorner = Instance.new("UICorner", MainFrame)
@@ -729,9 +734,30 @@ local function CreateGUI()
 
     HopBtn.MouseButton1Click:Connect(function()
         Config.AutoHopLowPlayers = not Config.AutoHopLowPlayers
-        HopBtn.Text = "Low Player Hop: " .. (Config.AutoHopLowPlayers and "ENABLED" or "DISABLED")
+        HopBtn.Text = "Low Player Hop: " .. (Config.AutoHopLowPlayers and "ON" or "OFF")
         HopBtn.TextColor3 = Config.AutoHopLowPlayers and Color3.fromRGB(150, 255, 150) or Color3.fromRGB(255, 150, 150)
         Log("Low Player Hop changed to:", Config.AutoHopLowPlayers)
+        SaveConfig()
+    end)
+
+    -- Toggle High-Level Hop Button
+    local LvlBtn = Instance.new("TextButton")
+    LvlBtn.Parent = MainFrame
+    LvlBtn.Name = "LvlBtn"
+    LvlBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    LvlBtn.Position = UDim2.new(0.05, 0, 1, -74)
+    LvlBtn.Size = UDim2.new(0.9, 0, 0, 20)
+    LvlBtn.Font = Enum.Font.GothamBold
+    LvlBtn.Text = "High Lvl Hop: " .. (Config.HopOnHighLevel and "ON" or "OFF")
+    LvlBtn.TextColor3 = Config.HopOnHighLevel and Color3.fromRGB(150, 255, 150) or Color3.fromRGB(255, 150, 150)
+    LvlBtn.TextSize = 12
+    Instance.new("UICorner", LvlBtn).CornerRadius = UDim.new(0, 5)
+
+    LvlBtn.MouseButton1Click:Connect(function()
+        Config.HopOnHighLevel = not Config.HopOnHighLevel
+        LvlBtn.Text = "High Lvl Hop: " .. (Config.HopOnHighLevel and "ON" or "OFF")
+        LvlBtn.TextColor3 = Config.HopOnHighLevel and Color3.fromRGB(150, 255, 150) or Color3.fromRGB(255, 150, 150)
+        Log("High Level Hop changed to:", Config.HopOnHighLevel)
         SaveConfig()
     end)
 
@@ -902,7 +928,24 @@ local function Main(StatusLabel, KillLabel, HopLabel, TimerLabel)
             return
         end
 
-        -- Server population check: Hop if only 1 other player (or none) left (If enabled)
+        -- High-level player hop check
+        if Config.HopOnHighLevel then
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer then
+                    pcall(function()
+                        local lvl = p.leaderstats and p.leaderstats:FindFirstChild("Level")
+                        if lvl and lvl.Value >= 200 then
+                            Log("HIGH LEVEL PLAYER detected:", p.Name, "Lv", lvl.Value)
+                            StatusLabel.Text = "⚠️ Lv" .. lvl.Value .. " player! Hopping..."
+                            task.wait(1)
+                            EmergencyHop(StatusLabel, "HIGH LVL PLAYER")
+                        end
+                    end)
+                end
+            end
+        end
+
+        -- Low player count hop
         if Config.AutoHopLowPlayers and #Players:GetPlayers() <= 2 then
             StatusLabel.Text = "👤 Low players, hopping..."
             task.wait(2)
@@ -1015,17 +1058,7 @@ local function Main(StatusLabel, KillLabel, HopLabel, TimerLabel)
                 StopFlyLock()
                 Log("FlyLock released for", bestTarget.Name)
 
-                -- Check kill
-                if not IsPlayerAlive(bestTarget) then
-                    Log("Kill confirmed:", bestTarget.Name)
-                    Config.SessionKills = Config.SessionKills + 1
-                    Config.TotalKills = Config.TotalKills + 1
-                    SaveConfig()
-                    KillLabel.Text = "🗡️ Kills: " .. Config.TotalKills .. " (Session: " .. Config.SessionKills .. ")"
-                    StatusLabel.Text = "✅ " .. bestTarget.Name .. " killed!"
-                -- Mark target with cooldown no matter what (always advance queue)
                 skipList[bestTarget.Name] = tick()
-                -- Check kill
                 if not IsPlayerAlive(bestTarget) then
                     Log("Kill confirmed:", bestTarget.Name)
                     Config.SessionKills = Config.SessionKills + 1
