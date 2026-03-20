@@ -81,7 +81,8 @@ local Config = {
     TotalKills = 0,
     SessionKills = 0,
     HopCount = 0,
-    AttackMode = "Orbit" -- Orbit or Under
+    AttackMode = "Orbit", -- Orbit or Under
+    AutoHopLowPlayers = true -- Toggle for low player count hop
 }
 
 local DEBUG_MODE = true
@@ -596,8 +597,8 @@ local function CreateGUI()
     MainFrame.Name = "MainFrame"
     MainFrame.Parent = ScreenGui
     MainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
-    MainFrame.Position = UDim2.new(0, 10, 0.5, -80)
-    MainFrame.Size = UDim2.new(0, 220, 0, 185) -- Slightly bigger for new button
+    MainFrame.Position = UDim2.new(0, 10, 0.5, -100)
+    MainFrame.Size = UDim2.new(0, 220, 0, 210) -- Bigger for more buttons
     MainFrame.Active = true
     MainFrame.Draggable = true
     local mainCorner = Instance.new("UICorner", MainFrame)
@@ -709,6 +710,28 @@ local function CreateGUI()
         end
         ModeBtn.Text = "Attack Mode: " .. Config.AttackMode:upper()
         Log("Attack Mode changed to:", Config.AttackMode)
+        SaveConfig()
+    end)
+
+    -- Toggle Low Player Hop Button
+    local HopBtn = Instance.new("TextButton")
+    HopBtn.Parent = MainFrame
+    HopBtn.Name = "HopBtn"
+    HopBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    HopBtn.Position = UDim2.new(0.05, 0, 1, -50)
+    HopBtn.Size = UDim2.new(0.9, 0, 0, 20)
+    HopBtn.Font = Enum.Font.GothamBold
+    HopBtn.Text = "Low Player Hop: " .. (Config.AutoHopLowPlayers and "ENABLED" or "DISABLED")
+    HopBtn.TextColor3 = Config.AutoHopLowPlayers and Color3.fromRGB(150, 255, 150) or Color3.fromRGB(255, 150, 150)
+    HopBtn.TextSize = 12
+    local hopCorner = Instance.new("UICorner", HopBtn)
+    hopCorner.CornerRadius = UDim.new(0, 5)
+
+    HopBtn.MouseButton1Click:Connect(function()
+        Config.AutoHopLowPlayers = not Config.AutoHopLowPlayers
+        HopBtn.Text = "Low Player Hop: " .. (Config.AutoHopLowPlayers and "ENABLED" or "DISABLED")
+        HopBtn.TextColor3 = Config.AutoHopLowPlayers and Color3.fromRGB(150, 255, 150) or Color3.fromRGB(255, 150, 150)
+        Log("Low Player Hop changed to:", Config.AutoHopLowPlayers)
         SaveConfig()
     end)
 
@@ -857,6 +880,10 @@ local function Main(StatusLabel, KillLabel, HopLabel, TimerLabel)
     EnableNoclip()
     local skipList = {} -- Players we couldn't kill → skip for 10s
     
+    -- ═══ TARGET CYCLING QUEUE ═══
+    local targetQueue = {}
+    local queueIndex = 1
+    
     while not scriptState.Stopped and not scriptState.Destroyed do
         if not IsLocalPlayerAlive() then
             StatusLabel.Text = "Dead! Waiting respawn..."
@@ -875,78 +902,63 @@ local function Main(StatusLabel, KillLabel, HopLabel, TimerLabel)
             return
         end
 
-        -- Server population check: Hop if only 1 other player (or none) left
-        if #Players:GetPlayers() <= 2 then
+        -- Server population check: Hop if only 1 other player (or none) left (If enabled)
+        if Config.AutoHopLowPlayers and #Players:GetPlayers() <= 2 then
             StatusLabel.Text = "👤 Low players, hopping..."
             task.wait(2)
             EmergencyHop(StatusLabel, "LOW PLAYERS")
             return
         end
 
-        -- PRIORITY 1: Read the game's assigned target from TargetUI
-        local assigned = GetAssignedTarget()
         local bestTarget = nil
         
-        -- Validate assigned target is alive, enemy, NOT in rotation cooldown, and NOT in lobby (dist check)
-        if assigned and IsPlayerAlive(assigned) and IsEnemy(assigned) then
-            local lastAtk = skipList[assigned.Name] or 0
-            local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-            local tHRP = assigned.Character and assigned.Character:FindFirstChild("HumanoidRootPart")
-            
-            if tick() - lastAtk > 1.5 then
-                if myHRP and tHRP then
-                    local dist = (myHRP.Position - tHRP.Position).Magnitude
-                    if dist < 500 then -- Ignore lobby players (usually > 1000 studs away)
-                        bestTarget = assigned
-                    end
-                end
-            end
-        end
-        
-        -- PRIORITY 2: Focus Cheaters/Exploiters
-        if not bestTarget then
-            for name, isCheat in pairs(CheaterRadar) do
-                if isCheat then
-                    local p = Players:FindFirstChild(name)
-                    if p and IsPlayerAlive(p) and IsEnemy(p) then
-                        bestTarget = p
-                        Log("RADAR FOCUS: Targeting Cheater", p.Name)
-                        break
-                    else
-                        CheaterRadar[name] = nil -- Player left or died
-                    end
+        -- STEP 1: Cheaters first (Priority 0)
+        for name, isCheat in pairs(CheaterRadar) do
+            if isCheat then
+                local p = Players:FindFirstChild(name)
+                if p and IsPlayerAlive(p) and IsEnemy(p) then
+                    bestTarget = p
+                    Log("RADAR: Targeting Cheater", p.Name)
+                    break
+                else
+                    CheaterRadar[name] = nil
                 end
             end
         end
 
-        -- PRIORITY 3: Fallback to nearest alive enemy (with rotation cycle)
+        -- STEP 2: Strict queue rotation - visits EVERY player in order
         if not bestTarget then
-            local bestDist = math.huge
-            local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-            if myHRP then
-                for _, player in ipairs(Players:GetPlayers()) do
-                    if player ~= LocalPlayer and IsPlayerAlive(player) and IsEnemy(player) then
-                        -- Check cycle delay
-                        local lastAtk = skipList[player.Name] or 0
-                        if tick() - lastAtk > 1.5 then
-                            local theirHRP = player.Character:FindFirstChild("HumanoidRootPart")
-                            if theirHRP then
-                                local dist = (theirHRP.Position - myHRP.Position).Magnitude
-                                if dist < bestDist then
-                                    bestDist = dist
-                                    bestTarget = player
-                                end
-                            end
-                        end
+            -- Rebuild queue when exhausted
+            if queueIndex > #targetQueue then
+                -- Wipe old skip-stamps so nobody is permanently blocked
+                -- (they will get re-stamped when attacked)
+                skipList = {}
+                targetQueue = {}
+                local temp = {}
+                for _, p in ipairs(Players:GetPlayers()) do
+                    if p ~= LocalPlayer and IsEnemy(p) then
+                        table.insert(temp, p)
                     end
                 end
+                -- Fisher-Yates shuffle for variety
+                for i = #temp, 2, -1 do
+                    local j = math.random(1, i)
+                    temp[i], temp[j] = temp[j], temp[i]
+                end
+                targetQueue = temp
+                queueIndex = 1
+                Log("QUEUE rebuilt:", #targetQueue, "targets")
             end
-            
-            -- If everyone is in cooldown, pick anyone to avoid standing still
-            if not bestTarget then
-                for _, player in ipairs(Players:GetPlayers()) do
-                    if player ~= LocalPlayer and IsPlayerAlive(player) and IsEnemy(player) then
-                        bestTarget = player
+
+            -- Walk forward in the queue until we find a ready target
+            while queueIndex <= #targetQueue do
+                local p = targetQueue[queueIndex]
+                queueIndex = queueIndex + 1        -- Always advance
+                if p and p.Parent and IsPlayerAlive(p) and IsEnemy(p) then
+                    local lastAtk = skipList[p.Name] or 0
+                    if tick() - lastAtk > 2.0 then
+                        bestTarget = p
+                        Log("QUEUE trip:", p.Name, "(" .. (queueIndex-1) .. "/" .. #targetQueue .. ")")
                         break
                     end
                 end
@@ -1011,9 +1023,16 @@ local function Main(StatusLabel, KillLabel, HopLabel, TimerLabel)
                     SaveConfig()
                     KillLabel.Text = "🗡️ Kills: " .. Config.TotalKills .. " (Session: " .. Config.SessionKills .. ")"
                     StatusLabel.Text = "✅ " .. bestTarget.Name .. " killed!"
-                else
-                    -- Still alive? Add to 1.5s rotation cooldown so we pick someone else next
-                    skipList[bestTarget.Name] = tick()
+                -- Mark target with cooldown no matter what (always advance queue)
+                skipList[bestTarget.Name] = tick()
+                -- Check kill
+                if not IsPlayerAlive(bestTarget) then
+                    Log("Kill confirmed:", bestTarget.Name)
+                    Config.SessionKills = Config.SessionKills + 1
+                    Config.TotalKills = Config.TotalKills + 1
+                    SaveConfig()
+                    KillLabel.Text = "🗡️ Kills: " .. Config.TotalKills .. " (Session: " .. Config.SessionKills .. ")"
+                    StatusLabel.Text = "✅ " .. bestTarget.Name .. " killed!"
                 end
             end
             -- NO WAIT — immediately find next target
